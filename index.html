@@ -69,12 +69,13 @@ function restart(){if(!confirm('Restart 75 Hard from Day 1 today? All progress w
 async function askPerm(){if(!('Notification' in window))return alert('Notifications not supported here. On iPhone, add to Home Screen first.');await Notification.requestPermission();render()}
 async function notify(title,body,tag){if(!('Notification' in window)||Notification.permission!=='granted')return alert('Enable notifications first.');try{const r=await navigator.serviceWorker.ready;r.showNotification(title,{body,tag,icon:'icon.svg'})}catch(e){new Notification(title,{body})}}
 function tick(){document.getElementById('clock').textContent=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});if(!S)return;
-if(S.lastDay!==today()){S.lastDay=today();save();render()}const n=dayNum();if(n<1||n>75||!('Notification' in window)||Notification.permission!=='granted')return;
+if(S.lastDay!==today()){S.lastDay=today();save();if(!editing())render()}const n=dayNum();if(n<1||n>75||!('Notification' in window)||Notification.permission!=='granted')return;
 const now=new Date(),hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),d=day(today());S.fired=S.fired||{};
 S.tasks.forEach(t=>{const k=today()+t.id;if(t.time<=hm&&!S.fired[k]){S.fired[k]=1;save();const dt=d.tasks.find(x=>x.id===t.id);if(dt&&!dt.done&&diffMin(t.time,hm)<60)notify('75 Hard – Day '+n,t.name,k)}})}
 const diffMin=(a,b)=>{const f=s=>s.split(':')[0]*60+ +s.split(':')[1];return f(b)-f(a)};
 document.getElementById('nav').onclick=e=>{if(e.target.dataset.v){view=e.target.dataset.v;render()}};
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){render();tick()}});
+const editing=()=>!S||view==='set'||view==='settings'||(document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(!editing())render();tick()}});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 render();tick();setInterval(tick,20000);
 </script></body></html>
