@@ -1,0 +1,80 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>75 Hard Tracker</title><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0d0f12"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon.svg"><meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root{--bg:#0d0f12;--card:#171a1f;--line:#262a31;--tx:#eef0f3;--mut:#8b929c;--red:#ff4d4d;--grn:#2ecc71;--blu:#3d8bff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;padding:env(safe-area-inset-top) 0 90px}
+header{padding:18px 18px 6px;display:flex;justify-content:space-between;align-items:center}h1{margin:0;font-size:22px;letter-spacing:1px}h1 b{color:var(--red)}
+main{padding:0 14px;max-width:560px;margin:auto}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+.big{font-size:34px;font-weight:800}.mut{color:var(--mut);font-size:14px}.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:10px}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--red),#ff9a4d)}
+.task{display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid var(--line);cursor:pointer;min-height:64px}.task:last-child{border:0}
+.box{flex:0 0 34px;height:34px;border-radius:10px;border:2px solid var(--mut);display:grid;place-items:center;font-size:20px}.done .box{background:var(--grn);border-color:var(--grn);color:#000}.done .tn{text-decoration:line-through;color:var(--mut)}
+.tn{font-weight:600}button{font:inherit;border:0;border-radius:12px;padding:14px 18px;background:var(--blu);color:#fff;font-weight:700;min-height:48px;cursor:pointer}button.sec{background:var(--line)}button.red{background:var(--red)}
+input{font:inherit;background:#0d0f12;color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:12px;min-height:48px}input[type=text]{width:100%}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.d{aspect-ratio:1;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:14px;background:var(--line);cursor:pointer;border:2px solid transparent}
+.d.c{background:var(--grn);color:#000}.d.x{background:var(--red)}.d.t{border-color:var(--blu);background:#1c2c48}.d.f{opacity:.4;cursor:default}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#111418;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}nav button{flex:1;background:none;border-radius:0;color:var(--mut);padding:16px 0}nav button.on{color:var(--tx)}
+.row{display:flex;gap:10px;align-items:center;margin:10px 0}.row input[type=text]{flex:1}.legend span{display:inline-block;width:12px;height:12px;border-radius:3px;margin:0 4px 0 10px;vertical-align:middle}
+.modal{position:fixed;inset:0;background:#000a;display:none;align-items:flex-end;justify-content:center;z-index:9}.modal.on{display:flex}.modal .card{width:100%;max-width:560px;margin:0;border-radius:20px 20px 0 0;max-height:85vh;overflow:auto}
+.pill{padding:3px 10px;border-radius:20px;font-size:13px;font-weight:700}.pill.c{background:var(--grn);color:#000}.pill.x{background:var(--red)}.warn{border-color:var(--red)}
+</style></head><body>
+<header><h1>75 <b>HARD</b></h1><span class="mut" id="clock"></span></header>
+<main id="app"></main>
+<nav id="nav"><button data-v="today" class="on">Today</button><button data-v="cal">Calendar</button><button data-v="set">Settings</button></nav>
+<div class="modal" id="modal" onclick="if(event.target===this)this.classList.remove('on')"><div class="card" id="mbody"></div></div>
+<script>
+const K='75hard-v1',DEF=[["Workout 1 (45 min)","06:00"],["Workout 2 – OUTDOORS (45 min)","17:00"],["Follow diet – no cheat meals or alcohol","20:00"],["Drink 1 gallon of water","19:00"],["Read 10 pages of nonfiction","21:00"],["Take a progress photo","07:00"]];
+let S=JSON.parse(localStorage.getItem(K)||'null'),view='today';
+const save=()=>localStorage.setItem(K,JSON.stringify(S));
+const ymd=d=>{const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())};
+const today=()=>ymd(new Date());const addD=(s,n)=>{const d=new Date(s+'T12:00');d.setDate(d.getDate()+n);return ymd(d)};
+const diff=(a,b)=>Math.round((new Date(b+'T12:00')-new Date(a+'T12:00'))/864e5);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtD=s=>new Date(s+'T12:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+const fmtT=t=>{const[h,m]=t.split(':');const d=new Date();d.setHours(h,m);return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})};
+function day(s){if(!S.days[s])S.days[s]={tasks:S.tasks.map(t=>({id:t.id,name:t.name,done:null})),status:null};return S.days[s]}
+function dayNum(){return diff(S.start,today())+1}
+function finalize(){if(!S)return;const t=today();let n=0;for(let i=0;i<75;i++){const s=addD(S.start,i);if(s>=t)break;const d=day(s);if(!d.status){d.status=d.tasks.every(x=>x.done)?'complete':'incomplete';n++}}if(n)save()}
+function stats(){let c=0,x=0;for(let i=0;i<75;i++){const d=S.days[addD(S.start,i)];if(d&&d.status==='complete')c++;if(d&&d.status==='incomplete')x++}return{c,x}}
+function render(){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));document.getElementById('nav').style.display=S?'flex':'none';
+const A=document.getElementById('app');if(!S)return A.innerHTML=setupHTML(true);finalize();A.innerHTML=view==='today'?todayHTML():view==='cal'?calHTML():setupHTML(false)}
+function todayHTML(){const n=dayNum(),st=stats();if(n<1)return`<div class="card"><div class="big">Starts ${fmtD(S.start)}</div><p class="mut">${-n+1} day(s) to go. Get ready.</p></div>`;
+const pct=Math.min(100,Math.round(st.c/75*100)),tp=Math.min(100,Math.round(Math.min(n,75)/75*100));
+let h=`<div class="card"><div class="mut">${fmtD(today())}</div><div class="big">Day ${Math.min(n,75)} <span class="mut" style="font-size:18px">of 75</span></div><div class="bar"><i style="width:${tp}%"></i></div><div class="row mut" style="justify-content:space-between"><span><b style="color:var(--tx)">${tp}%</b> through the challenge</span><span>${st.c} complete · ${st.x} missed</span></div></div>`;
+if(st.x)h+=`<div class="card warn"><b>⚠️ ${st.x} day(s) incomplete.</b><p class="mut">75 Hard rule: miss any task on any day and you restart at Day 1.</p><button class="red" onclick="restart()">Restart challenge</button></div>`;
+if(n>75)return h+`<div class="card"><div class="big">🏁 Done!</div><p class="mut">The 75 days are over. Tap Calendar to review.</p></div>`;
+const d=day(today());save();const dn=d.tasks.filter(t=>t.done).length;
+h+=`<div class="card"><div class="row" style="justify-content:space-between;margin:0 0 6px"><b>Today's tasks</b><span class="mut">${dn}/${d.tasks.length}</span></div>`;
+d.tasks.forEach((t,i)=>{const tt=S.tasks.find(x=>x.id===t.id);h+=`<div class="task ${t.done?'done':''}" onclick="tog(${i})"><div class="box">${t.done?'✓':''}</div><div><div class="tn">${esc(t.name)}</div><div class="mut">${t.done?'Done at '+new Date(t.done).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):tt?'Reminder '+fmtT(tt.time):''}</div></div></div>`});
+return h+`</div><p class="mut" style="text-align:center">Unchecked tasks at midnight = day marked incomplete.</p>`}
+function tog(i){const d=day(today()),t=d.tasks[i];t.done=t.done?null:Date.now();save();render()}
+function calHTML(){const t=today();let h=`<div class="card"><b>Your 75 days</b><div class="mut legend" style="margin:8px 0 12px"><span style="background:var(--grn)"></span>Complete<span style="background:var(--red)"></span>Incomplete<span style="background:#1c2c48;border:1px solid var(--blu)"></span>Today</div><div class="grid">`;
+for(let i=0;i<75;i++){const s=addD(S.start,i),d=S.days[s];const c=s===t?'t':s>t?'f':d&&d.status==='complete'?'c':'x';h+=`<div class="d ${c}" title="${s}" onclick="${c==='f'?'':`show('${s}')`}">${i+1}</div>`}
+return h+`</div><p class="mut">${fmtD(S.start)} → ${fmtD(addD(S.start,74))}. Tap a day for its breakdown.</p></div>`}
+function show(s){const d=day(s),i=diff(S.start,s)+1,st=s===today()?'In progress':d.status;
+let h=`<div class="row" style="justify-content:space-between"><div><div class="big" style="font-size:26px">Day ${i}</div><div class="mut">${fmtD(s)}</div></div><span class="pill ${st==='complete'?'c':st==='incomplete'?'x':''}">${esc(st)}</span></div>`;
+d.tasks.forEach(t=>h+=`<div class="task ${t.done?'done':''}" style="cursor:default"><div class="box" style="${t.done?'':'border-color:var(--red);color:var(--red)'}">${t.done?'✓':'✕'}</div><div><div class="tn">${esc(t.name)}</div><div class="mut">${t.done?'Checked '+new Date(t.done).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'Missed'}</div></div></div>`);
+document.getElementById('mbody').innerHTML=h+`<button class="sec" style="width:100%;margin-top:12px" onclick="modal.classList.remove('on')">Close</button>`;modal.classList.add('on')}
+function setupHTML(first){const ts=S?S.tasks:DEF.map((d,i)=>({id:'t'+i,name:d[0],time:d[1]}));const perm='Notification' in window?Notification.permission:'unsupported';
+let h=`<div class="card">${first?'<div class="big" style="font-size:26px">Set up your 75 Hard</div><p class="mut">Pick your start date and reminder times.</p>':'<b>Settings</b>'}
+<div class="row"><label style="flex:1">Start date</label><input type="date" id="sd" value="${S?S.start:today()}"></div></div><div class="card"><b>Tasks & reminder times</b><div id="tl">`;
+ts.forEach(t=>h+=`<div class="row" data-id="${t.id}"><input type="text" value="${esc(t.name)}"><input type="time" value="${t.time}"><button class="sec" onclick="this.parentNode.remove()" aria-label="remove">✕</button></div>`);
+h+=`</div><button class="sec" onclick="addRow()">+ Add task</button></div><button style="width:100%" onclick="saveSet()">${first?'Start challenge':'Save settings'}</button>
+<div class="card"><b>Reminders</b> <span class="mut">(${perm})</span><p class="mut">Notifications fire at each task's time (only if not yet checked). <b>Limitation:</b> with no push server, reminders only fire reliably while the app is open or recently backgrounded. iPhone: first “Add to Home Screen” from Safari, open it from there, then enable. Phones may suspend the app and delay/skip reminders — keep it open in the background, or also set phone alarms as backup.</p><button onclick="askPerm()">Enable notifications</button> <button class="sec" onclick="notify('Test reminder','Notifications are working 💪','test')">Test</button></div>`;
+if(!first)h+=`<div class="card"><b>Danger zone</b><p class="mut">Restart wipes progress and starts Day 1 today.</p><button class="red" onclick="restart()">Restart challenge</button></div>`;return h}
+function addRow(){const r=document.createElement('div');r.className='row';r.dataset.id='t'+Date.now();r.innerHTML='<input type="text" placeholder="New task"><input type="time" value="12:00"><button class="sec" onclick="this.parentNode.remove()">✕</button>';document.getElementById('tl').appendChild(r)}
+function saveSet(){const tasks=[...document.querySelectorAll('#tl .row')].map(r=>{const i=r.querySelectorAll('input');return{id:r.dataset.id,name:i[0].value.trim(),time:i[1].value||'12:00'}}).filter(t=>t.name);if(!tasks.length)return alert('Add at least one task');
+const sd=document.getElementById('sd').value||today();if(!S)S={start:sd,tasks,days:{},fired:{}};else{if(sd!==S.start&&!confirm('Changing the start date resets your progress. Continue?'))return;if(sd!==S.start)S.days={};S.start=sd;S.tasks=tasks;
+const d=S.days[today()];if(d&&!d.status)d.tasks=tasks.map(t=>({id:t.id,name:t.name,done:(d.tasks.find(x=>x.id===t.id)||{}).done||null}))}save();view='today';render()}
+function restart(){if(!confirm('Restart 75 Hard from Day 1 today? All progress will be cleared.'))return;S.start=today();S.days={};S.fired={};save();view='today';render()}
+async function askPerm(){if(!('Notification' in window))return alert('Notifications not supported here. On iPhone, add to Home Screen first.');await Notification.requestPermission();render()}
+async function notify(title,body,tag){if(!('Notification' in window)||Notification.permission!=='granted')return alert('Enable notifications first.');try{const r=await navigator.serviceWorker.ready;r.showNotification(title,{body,tag,icon:'icon.svg'})}catch(e){new Notification(title,{body})}}
+function tick(){document.getElementById('clock').textContent=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});if(!S)return;
+if(S.lastDay!==today()){S.lastDay=today();save();render()}const n=dayNum();if(n<1||n>75||!('Notification' in window)||Notification.permission!=='granted')return;
+const now=new Date(),hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),d=day(today());S.fired=S.fired||{};
+S.tasks.forEach(t=>{const k=today()+t.id;if(t.time<=hm&&!S.fired[k]){S.fired[k]=1;save();const dt=d.tasks.find(x=>x.id===t.id);if(dt&&!dt.done&&diffMin(t.time,hm)<60)notify('75 Hard – Day '+n,t.name,k)}})}
+const diffMin=(a,b)=>{const f=s=>s.split(':')[0]*60+ +s.split(':')[1];return f(b)-f(a)};
+document.getElementById('nav').onclick=e=>{if(e.target.dataset.v){view=e.target.dataset.v;render()}};
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){render();tick()}});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+render();tick();setInterval(tick,20000);
+</script></body></html>
