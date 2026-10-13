@@ -42,6 +42,17 @@ nav button.on{color:var(--red)}nav button.on svg{filter:drop-shadow(0 0 6px #ff3
 .cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222;padding:10px 16px;border-radius:12px;z-index:20;opacity:0;transition:.3s;pointer-events:none}.toast.on{opacity:1}
 .rules li{margin:6px 0}
+.hero2{background:radial-gradient(140% 90% at 100% 0%,#3a1a0e 0%,#16181c 55%),var(--card);border-color:#3a2a20;box-shadow:0 10px 40px #ff3b3018}
+.hero2:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(135deg,#ffffff05 0 2px,transparent 2px 10px);pointer-events:none}
+.stamp{position:absolute;top:14px;right:-34px;transform:rotate(35deg);background:var(--red);font:700 10px var(--hd);letter-spacing:2px;padding:4px 40px}
+.avatar{flex:0 0 92px;height:92px;border-radius:24px;display:grid;place-items:center;font:700 38px var(--hd);background:linear-gradient(145deg,var(--red),var(--org));box-shadow:0 0 0 3px #0a0b0d,0 0 0 5px #ff8a0088,0 0 24px #ff3b3055;overflow:hidden}.avatar img{width:100%;height:100%;object-fit:cover}
+.pname{font:700 30px/1.05 var(--hd);text-transform:uppercase;letter-spacing:1px;overflow-wrap:anywhere}
+.pstats,.wts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;text-align:center}.pstats>div,.wts>div{background:#0b0c0ecc;border:1px solid var(--line);border-radius:14px;padding:10px 4px}.wts b{font:700 20px var(--hd)}
+.wbar{height:8px;border-radius:5px;background:var(--line);margin-top:12px;overflow:hidden}.wbar i{display:block;height:100%;background:linear-gradient(90deg,var(--org),var(--grn))}
+blockquote{margin:14px 0 0;padding:10px 14px;border-left:3px solid var(--red);background:#0b0c0e99;border-radius:0 12px 12px 0;font-style:italic}
+.dobask{margin-top:12px;padding:10px 12px;border:1px dashed var(--org);border-radius:12px;color:var(--org);cursor:pointer;font-size:14px}
+.pedit{border-color:#3a2a20;background:linear-gradient(180deg,#1d1612,var(--card))}.pedit input:focus,.pedit textarea:focus{outline:none;border-color:var(--org);box-shadow:0 0 0 3px #ff8a0033}
+.lock{text-align:center;padding:36px 18px;background:repeating-linear-gradient(135deg,#ffffff04 0 2px,transparent 2px 10px),linear-gradient(180deg,var(--card2),var(--card))}.lockic{font-size:46px;filter:drop-shadow(0 0 14px #ff8a0066);margin-bottom:6px}
 </style></head><body>
 <header><h1>75 <b>Hard</b></h1><span class="tag" id="clock"></span></header>
 <main id="app"></main>
@@ -51,12 +62,14 @@ nav button.on{color:var(--red)}nav button.on svg{filter:drop-shadow(0 0 6px #ff3
 <input type="file" id="photoIn" accept="image/*" capture="environment" hidden>
 <input type="file" id="importIn" accept="application/json,.json" hidden>
 <script>
-const K='75hard-v1',SCHEMA=2,DEF=[["Workout 1 (45 min)","06:00"],["Workout 2 – OUTDOORS (45 min)","17:00"],["Follow diet – no cheat meals or alcohol","20:00"],["Drink 1 gallon of water","19:00"],["Read 10 pages of nonfiction","21:00"],["Take a progress photo","07:00"]];
+let profMode='view';
+const K='75hard-v1',SCHEMA=3,DEF=[["Workout 1 (45 min)","06:00"],["Workout 2 – OUTDOORS (45 min)","17:00"],["Follow diet – no cheat meals or alcohol","20:00"],["Drink 1 gallon of water","19:00"],["Read 10 pages of nonfiction","21:00"],["Take a progress photo","07:00"]];
 let view='today';
 /* ---------- state + migration (lossless) ---------- */
 function migrate(s){if(!s||typeof s!=='object')return null;const v=s.v||1;
  if(v<2){try{localStorage.setItem(K+'-backup-v1',JSON.stringify(s))}catch(e){}
   s.days=s.days||{};s.fired=s.fired||{};s.tasks=s.tasks||[];s.profile=s.profile||{};s.weights=s.weights||[];s.attempts=s.attempts||[];s.aid=s.aid||'a1';s.v=2}
+ if((s.v||1)<3){s.profile=s.profile||{};if(s.profile.age&&!s.profile.legacyAge)s.profile.legacyAge=s.profile.age;s.v=3}
  return s}
 let S=migrate(JSON.parse(localStorage.getItem(K)||'null'));if(S)localStorage.setItem(K,JSON.stringify(S));
 const save=()=>localStorage.setItem(K,JSON.stringify(S));
@@ -82,8 +95,10 @@ let photoSet=new Set();async function loadPhotoSet(){try{const ks=await allKeys(
 async function compress(file){const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file)});
  const sc=Math.min(1,1080/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(img.src);
  return new Promise(r=>c.toBlob(r,'image/jpeg',.82))}
-let photoDay=null;function takePhoto(s){photoDay=s||today();$('photoIn').value='';$('photoIn').click()}
-$('photoIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;photoDay=photoDay||today();try{const b=await compress(f);const k=pKey(photoDay);await putPhoto(k,b);if(urlCache[k])URL.revokeObjectURL(urlCache[k]);delete urlCache[k];photoSet.add(photoDay);
+const canPhoto=s=>!!S&&!!s&&s>=S.start&&s<=today()&&s<=addD(S.start,74);
+const lockMsg=()=>dayNum()<1?'Photos unlock on Day 1 — '+fmtD(S.start):'Photos are only for today and past challenge days';
+let photoDay=null;function takePhoto(s){s=s||today();if(!canPhoto(s))return toast(lockMsg());photoDay=s;$('photoIn').value='';$('photoIn').click()}
+$('photoIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;photoDay=photoDay||today();if(!canPhoto(photoDay)){photoDay=null;return toast(lockMsg())}try{const b=await compress(f);const k=pKey(photoDay);await putPhoto(k,b);if(urlCache[k])URL.revokeObjectURL(urlCache[k]);delete urlCache[k];photoSet.add(photoDay);
  const d=day(photoDay);if(!d.status||photoDay===today()){d.tasks.forEach(t=>{if(isPhotoTask(t)&&!t.done)t.done=Date.now()})}save();photoDay=null;toast('Photo saved');closeM();render()}catch(err){alert('Could not save photo: '+err.message)}};
 /* ---------- challenge logic ---------- */
 function day(s){if(!S.days[s])S.days[s]={tasks:S.tasks.map(t=>({id:t.id,name:t.name,done:null})),status:null};return S.days[s]}
@@ -100,7 +115,7 @@ const FLAME='<svg viewBox="0 0 24 30"><defs><linearGradient id="fg" x1="0" y1="1
 function render(){const nav=$('nav');nav.style.display=S?'flex':'none';nav.innerHTML=NAV.map(([v,l])=>`<button data-v="${v}" class="${v===view?'on':''}"><svg viewBox="0 0 24 24">${IC[v]}</svg>${l}</button>`).join('');
  const A=$('app');if(!S)return A.innerHTML=setupHTML(true);finalize();
  A.innerHTML=view==='today'?todayHTML():view==='cal'?calHTML():view==='gal'?galHTML():view==='stats'?statsHTML():setupHTML(false);
- if(view==='gal')hydrateGal();if(view==='today')hydrateToday()}
+ if(view==='gal')hydrateGal();if(view==='set')hydrateAvatar();if(view==='today')hydrateToday()}
 function ring(n,tot,pct){const r=64,C=2*Math.PI*r;return`<div class="ring"><svg width="150" height="150"><defs><linearGradient id="rg"><stop offset="0" stop-color="#ff3b30"/><stop offset="1" stop-color="#ff8a00"/></linearGradient></defs><circle cx="75" cy="75" r="${r}" stroke="#23262b" stroke-width="12" fill="none"/><circle class="p" cx="75" cy="75" r="${r}" stroke="url(#rg)" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct/100)}"/></svg><div class="in"><div><div class="o">DAY</div><div class="n">${n}</div><div class="o">/ ${tot}</div></div></div></div>`}
 function flameHTML(st){return`<div class="flame ${st.cur?'':'off'}">${FLAME}<div><div class="big" style="font-size:24px">${st.cur} <span class="tag">day streak</span></div><div class="mut">Best: ${st.best}</div></div></div>`}
 function todayHTML(){const n=dayNum(),st=stats();const nm=S.profile.name?', '+esc(S.profile.name.split(' ')[0]):'';
@@ -122,10 +137,10 @@ async function show(s){const d=day(s),i=diff(S.start,s)+1,st=s===today()?'In pro
  let h=`<div class="row" style="justify-content:space-between"><div><div class="big">Day ${i}</div><div class="mut">${fmtD(s)}</div></div><span class="pill ${st==='complete'?'c':st==='incomplete'?'x':''}">${esc(st)}</span></div>`;
  d.tasks.forEach(t=>h+=`<div class="task ${t.done?'done':''}" style="cursor:default"><div class="box" style="${t.done?'':'border-color:var(--red)'}">${t.done?'<svg viewBox="0 0 24 24" style="stroke-dashoffset:0"><path d="M5 12l5 5 9-10"/></svg>':'<span style="color:var(--red);font-weight:700">✕</span>'}</div><div><div class="tn">${esc(t.name)}</div><div class="mut">${t.done?'Checked '+new Date(t.done).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'Missed'}</div></div></div>`);
  if(u)h+=`<img src="${u}" style="width:100%;border-radius:12px;margin-top:10px">`;
- openM(h+`<div class="row" style="margin-top:12px"><button class="sec" style="flex:1" onclick="takePhoto('${s}')">📷 ${u?'Replace':'Add'} photo</button><button class="ghost" style="flex:1" onclick="closeM()">Close</button></div>`)}
+ openM(h+`<div class="row" style="margin-top:12px">${canPhoto(s)?`<button class="sec" style="flex:1" onclick="takePhoto('${s}')">📷 ${u?'Replace':'Add'} photo</button>`:''}<button class="ghost" style="flex:1" onclick="closeM()">Close</button></div>`)}
 const MS=[1,7,30,50,75];
-function galHTML(){const t=today(),n=Math.min(Math.max(dayNum(),0),75);let h=`<div class="card"><h2>Milestones</h2><div class="ms">${MS.map(m=>{const s=addD(S.start,m-1),d=S.days[s];const ok=photoSet.has(s)||(d&&d.status==='complete');return`<div class="${ok?'ok':''}">${ok?'✓ ':''}D${m}</div>`}).join('')}</div></div>`;
- h+=`<div class="card"><div class="row" style="justify-content:space-between;margin:0 0 10px"><h2 style="margin:0">Progress Photos</h2><button style="min-height:40px;padding:8px 14px" onclick="takePhoto()">📷 Today</button></div><div class="strip" id="strip">`;
+function galHTML(){const t=today(),n=Math.min(Math.max(dayNum(),0),75);if(dayNum()<1)return`<div class="card lock"><div class="lockic">🔒</div><h2>Gallery Locked</h2><div class="big" style="font-size:22px">Photos unlock on Day 1</div><div class="tag" style="margin-top:6px;color:var(--org)">${fmtD(S.start)}</div><p class="mut">No early photos. Your Day 1 shot is the baseline everything gets compared against.</p></div>`;const live=canPhoto(t);let h=`<div class="card"><h2>Milestones</h2><div class="ms">${MS.map(m=>{const s=addD(S.start,m-1),d=S.days[s];const ok=photoSet.has(s)||(d&&d.status==='complete');return`<div class="${ok?'ok':''}">${ok?'✓ ':''}D${m}</div>`}).join('')}</div></div>`;
+ h+=`<div class="card"><div class="row" style="justify-content:space-between;margin:0 0 10px"><h2 style="margin:0">Progress Photos</h2>${live?'<button style="min-height:40px;padding:8px 14px" onclick="takePhoto()">📷 Today</button>':'<span class="pill">🔒 Closed</span>'}</div><div class="strip" id="strip">`;
  for(let i=0;i<n;i++){const s=addD(S.start,i);h+=photoSet.has(s)?`<div class="ph" data-s="${s}" onclick="show('${s}')"><img alt=""><div class="lb">DAY ${i+1}${MS.includes(i+1)?' ★':''}</div></div>`:`<div class="ph empty" onclick="takePhoto('${s}')" style="aspect-ratio:3/4"><div style="text-align:center"><div class="big" style="color:#444">DAY ${i+1}</div><div>Tap to add</div></div></div>`}
  h+=`</div><p class="mut">${photoSet.size} photo(s). Swipe to scroll through days.</p></div>`;
  const ds=[...photoSet].filter(s=>s>=S.start).sort();if(ds.length>=2)h+=`<div class="card"><h2>Compare</h2><div class="cmp"><div class="ph" id="cA"><img alt=""><div class="lb">DAY ${diff(S.start,ds[0])+1}</div></div><div class="ph" id="cB"><img alt=""><div class="lb">DAY ${diff(S.start,ds[ds.length-1])+1}</div></div></div></div>`;
@@ -143,8 +158,7 @@ function statsHTML(){const st=stats(),t=today();let past=0;const per={};
  return h+`<p class="mut" style="text-align:center">${S.attempts.length} archived attempt(s)</p>`}
 function setupHTML(first){const ts=S?S.tasks:DEF.map((d,i)=>({id:'t'+i,name:d[0],time:d[1]})),p=(S&&S.profile)||{},perm='Notification' in window?Notification.permission:'unsupported';
  let h='';if(first)h+=`<div class="card"><div class="big">Set up your 75 Hard</div><p class="mut">Pick your start date and reminder times.</p></div>`;
- if(!first)h+=`<div class="card"><h2>Profile</h2><label class="f"><span>Name</span><input id="pName" value="${esc(p.name)}"></label><div class="g2"><label class="f"><span>Age</span><input id="pAge" inputmode="numeric" value="${esc(p.age)}"></label><label class="f"><span>Height</span><input id="pHeight" placeholder="5'11&quot;" value="${esc(p.height)}"></label><label class="f"><span>Start weight</span><input id="pStartW" inputmode="decimal" value="${esc(p.startW)}"></label><label class="f"><span>Goal weight</span><input id="pGoalW" inputmode="decimal" value="${esc(p.goalW)}"></label></div><label class="f"><span>Why I'm doing this</span><textarea id="pWhy">${esc(p.why)}</textarea></label><button class="w" onclick="saveProfile()">Save profile</button></div>
- <div class="card"><h2>Weight Log</h2><div class="row"><input id="wIn" inputmode="decimal" placeholder="Today's weight"><button style="flex:0 0 auto" onclick="logW()">Log</button></div>${(S.weights||[]).slice(-5).reverse().map(w=>`<div class="row mut" style="justify-content:space-between"><span>${fmtD(w.date)}</span><b style="color:var(--tx)">${w.kg}</b></div>`).join('')}</div>`;
+ if(!first)h+=profileHTML();
  h+=`<div class="card"><h2>Challenge</h2><label class="f"><span>Start date</span><input type="date" id="sd" value="${S?S.start:today()}"></label><div class="tag" style="margin-top:12px">Tasks & reminder times</div><div id="tl">`;
  ts.forEach(t=>h+=`<div class="row" data-id="${t.id}"><input type="text" style="flex:1" value="${esc(t.name)}"><input type="time" style="flex:0 0 112px" value="${t.time}"><button class="sec" style="flex:0 0 48px;padding:0" onclick="this.parentNode.remove()" aria-label="remove">✕</button></div>`);
  h+=`</div><div class="row"><button class="sec" style="flex:1" onclick="addRow()">+ Add task</button><button style="flex:1" onclick="saveSet()">${first?'Start':'Save'}</button></div></div>`;
@@ -153,8 +167,25 @@ function setupHTML(first){const ts=S?S.tasks:DEF.map((d,i)=>({id:'t'+i,name:d[0]
  h+=`<div class="card"><h2>Backup</h2><p class="mut">Data lives only on this device. Export regularly (includes photos).</p><div class="row"><button class="sec" style="flex:1" onclick="exportData()">⬇ Export</button><button class="sec" style="flex:1" onclick="$('importIn').click()">⬆ Import</button></div></div>
  <div class="card"><h2>The Rules</h2><ol class="rules mut"><li>Follow a diet. No cheat meals, no alcohol.</li><li>Two 45-minute workouts. One must be outdoors.</li><li>Drink one gallon of water.</li><li>Read 10 pages of nonfiction.</li><li>Take a progress photo.</li></ol><p class="mut">Miss anything, any day → back to Day 1. No modifications, no substitutions.</p></div>
  <div class="card warn"><h2>Restart</h2><p class="mut">Starts Day 1 today. Your current attempt is archived in history, never deleted.</p><button onclick="restart()">Restart challenge</button></div><p class="mut" style="text-align:center">75 Hard Tracker · schema v${SCHEMA}</p>`;return h}
+function ageStr(dob){if(!dob)return'';const b=new Date(dob+'T12:00'),n=new Date(today()+'T12:00');let y=n.getFullYear()-b.getFullYear();let last=new Date(b);last.setFullYear(b.getFullYear()+y);if(last>n){y--;last=new Date(b);last.setFullYear(b.getFullYear()+y)}const d=Math.round((n-last)/864e5);return y+' years, '+d+' day'+(d===1?'':'s')}
+function initials(n){return(n||'75').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('')||'75'}
+function profileHTML(){const p=S.profile||{},w=S.weights||[],cur=w.length?w[w.length-1].kg:null,st=stats(),dn=Math.min(Math.max(dayNum(),0),75);
+ if(profMode==='edit')return`<div class="card pedit"><div class="row" style="justify-content:space-between;margin:0 0 6px"><h2 style="margin:0">Edit Profile</h2><span class="tag">Dossier</span></div>
+ <label class="f"><span>Name</span><input id="pName" value="${esc(p.name)}" placeholder="Your name"></label>
+ <label class="f"><span>Date of birth</span><input type="date" id="pDob" max="${today()}" value="${esc(p.dob)}"></label>${!p.dob&&p.legacyAge?`<div class="mut" style="margin-top:-4px">Previously saved age: ${esc(p.legacyAge)} — add your DOB for an exact age.</div>`:''}
+ <div class="g2"><label class="f"><span>Height</span><input id="pHeight" placeholder="5'11&quot;" value="${esc(p.height)}"></label><label class="f"><span>Start weight</span><input id="pStartW" inputmode="decimal" value="${esc(p.startW)}"></label><label class="f"><span>Goal weight</span><input id="pGoalW" inputmode="decimal" value="${esc(p.goalW)}"></label></div>
+ <label class="f"><span>Why I'm doing this</span><textarea id="pWhy" placeholder="The reason you won't quit">${esc(p.why)}</textarea></label>
+ <div class="row"><button class="ghost" style="flex:1" onclick="profMode='view';render()">Cancel</button><button style="flex:2" onclick="saveProfile()">Save</button></div></div>`;
+ const sw=parseFloat(p.startW),gw=parseFloat(p.goalW),cw=cur!=null?cur:sw;let prog='';if(sw&&gw&&sw!==gw){const pc=Math.max(0,Math.min(100,Math.round((sw-cw)/(sw-gw)*100)));prog=`<div class="wbar"><i style="width:${pc}%"></i></div><div class="mut" style="text-align:right">${pc}% to goal</div>`}
+ return`<div class="card hero2"><div class="stamp">ATTEMPT #${S.attempts.length+1}</div><div class="row" style="gap:16px;margin:0"><div class="avatar" id="avatar">${esc(initials(p.name))}</div><div style="min-width:0"><div class="tag" style="color:var(--org)">Operator</div><div class="pname">${esc(p.name||'Your Name')}</div><div class="mut" id="ageTxt">${p.dob?ageStr(p.dob):p.legacyAge?esc(p.legacyAge)+' years':'Age not set'}${p.height?' · '+esc(p.height):''}</div></div></div>
+ ${!p.dob?`<div class="dobask" onclick="profMode='edit';render()">🎂 Add your date of birth to track your exact age →</div>`:''}
+ <div class="pstats"><div><div class="big">${dn}</div><div class="tag">Day</div></div><div><div class="big">🔥${st.cur}</div><div class="tag">Streak</div></div><div><div class="big">${st.best}</div><div class="tag">Best</div></div></div>
+ <div class="wts"><div><div class="tag">Start</div><b>${esc(p.startW||'—')}</b></div><div><div class="tag">Current</div><b style="color:var(--org)">${cw||'—'}</b></div><div><div class="tag">Goal</div><b>${esc(p.goalW||'—')}</b></div></div>${prog}
+ ${p.why?`<blockquote>“${esc(p.why)}”</blockquote>`:''}<button class="sec w" style="margin-top:12px" onclick="profMode='edit';render()">✎ Edit profile</button></div>
+ <div class="card"><h2>Weight Log</h2><div class="row"><input id="wIn" inputmode="decimal" placeholder="Today's weight"><button style="flex:0 0 auto" onclick="logW()">Log</button></div>${w.slice(-5).reverse().map(x=>`<div class="row mut" style="justify-content:space-between"><span>${fmtD(x.date)}</span><b style="color:var(--tx)">${x.kg}</b></div>`).join('')}</div><div class="tag" style="margin:22px 4px 0">⚙ Settings</div>`}
+async function hydrateAvatar(){const ds=[...photoSet].filter(x=>x>=S.start).sort();const el=$('avatar');if(!el||!ds.length)return;const u=await photoURL(ds[ds.length-1]).catch(()=>null);if(u)el.innerHTML=`<img src="${u}" alt="">`}
 function addRow(){const r=document.createElement('div');r.className='row';r.dataset.id='t'+Date.now();r.innerHTML='<input type="text" style="flex:1" placeholder="New task"><input type="time" style="flex:0 0 112px" value="12:00"><button class="sec" style="flex:0 0 48px;padding:0" onclick="this.parentNode.remove()">✕</button>';$('tl').appendChild(r)}
-function saveProfile(){const g=id=>$(id).value.trim();S.profile={...S.profile,name:g('pName'),age:g('pAge'),height:g('pHeight'),startW:g('pStartW'),goalW:g('pGoalW'),why:g('pWhy')};save();toast('Profile saved')}
+function saveProfile(){const g=id=>$(id).value.trim();if(g('pDob')&&g('pDob')>today())return alert('Date of birth can’t be in the future');S.profile={...S.profile,name:g('pName'),dob:g('pDob'),height:g('pHeight'),startW:g('pStartW'),goalW:g('pGoalW'),why:g('pWhy')};save();profMode='view';toast('Profile saved');render()}
 function logW(){const v=parseFloat($('wIn').value);if(!v)return;S.weights=S.weights||[];const t=today(),e=S.weights.find(w=>w.date===t);if(e)e.kg=v;else S.weights.push({date:t,kg:v});save();toast('Weight logged');render()}
 function saveSet(){const tasks=[...document.querySelectorAll('#tl .row')].map(r=>{const i=r.querySelectorAll('input');return{id:r.dataset.id,name:i[0].value.trim(),time:i[1].value||'12:00'}}).filter(t=>t.name);if(!tasks.length)return alert('Add at least one task');
  const sd=$('sd').value||today();if(!S){S=migrate({start:sd,tasks,days:{},fired:{}});save();view='today';loadPhotoSet().then(render);return}
@@ -171,11 +202,11 @@ $('importIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;photoDay
 async function askPerm(){if(!('Notification' in window))return alert('Notifications not supported here. On iPhone, add to Home Screen first.');await Notification.requestPermission();render()}
 async function notify(title,body,tag){if(!('Notification' in window)||Notification.permission!=='granted')return alert('Enable notifications first.');try{const r=await navigator.serviceWorker.ready;r.showNotification(title,{body,tag,icon:'icon.svg'})}catch(e){new Notification(title,{body})}}
 const diffMin=(a,b)=>{const f=s=>s.split(':')[0]*60+ +s.split(':')[1];return f(b)-f(a)};
-function tick(){$('clock').textContent=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});if(!S)return;
+function tick(){$('clock').textContent=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});if(!S)return;const at=$('ageTxt');if(at&&S.profile.dob){const t=ageStr(S.profile.dob)+(S.profile.height?' · '+S.profile.height:'');if(at.textContent!==t)at.textContent=t}
  if(S.lastDay!==today()){S.lastDay=today();save();if(!editing())render()}const n=dayNum();if(n<1||n>75||!('Notification' in window)||Notification.permission!=='granted')return;
  const now=new Date(),h=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),d=day(today());S.fired=S.fired||{};
  S.tasks.forEach(t=>{const k=today()+t.id;if(t.time<=h&&!S.fired[k]){S.fired[k]=1;save();const dt=d.tasks.find(x=>x.id===t.id);if(dt&&!dt.done&&diffMin(t.time,h)<60)notify('75 Hard – Day '+n,t.name,k)}})}
-$('nav').onclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.v){view=b.dataset.v;window.scrollTo(0,0);render()}};
+$('nav').onclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.v){view=b.dataset.v;profMode='view';window.scrollTo(0,0);render()}};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(!editing())render();tick()}});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 render();if(S)loadPhotoSet().then(()=>{if(!editing())render()});tick();setInterval(tick,20000);
