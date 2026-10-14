@@ -56,6 +56,7 @@ nav button.on{color:var(--red)}nav button.on svg{filter:drop-shadow(0 0 6px #ff3
 blockquote{margin:14px 0 0;padding:10px 14px;border-left:3px solid var(--red);background:#0b0c0e99;border-radius:0 12px 12px 0;font-style:italic}
 .dobask{margin-top:12px;padding:10px 12px;border:1px dashed var(--org);border-radius:12px;color:var(--org);cursor:pointer;font-size:14px}
 .pedit{border-color:#3a2a20;background:linear-gradient(180deg,#1d1612,var(--card))}.pedit input:focus,.pedit textarea:focus{outline:none;border-color:var(--org);box-shadow:0 0 0 3px #ff8a0033}
+.crows{margin-top:14px}.crow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}.crow:last-child{border-bottom:0}.crow .tn{overflow-wrap:anywhere}.crow .tm{font:700 15px var(--hd);letter-spacing:.5px;color:var(--org);flex:0 0 auto}
 .lock{text-align:center;padding:36px 18px;background:repeating-linear-gradient(135deg,#ffffff04 0 2px,transparent 2px 10px),linear-gradient(180deg,var(--card2),var(--card))}.lockic{font-size:46px;filter:drop-shadow(0 0 14px #ff8a0066);margin-bottom:6px}
 </style></head><body>
 <header><h1>75 <b>Hard</b></h1><span class="tag" id="clock"></span></header>
@@ -69,7 +70,7 @@ blockquote{margin:14px 0 0;padding:10px 14px;border-left:3px solid var(--red);ba
 ['gesturestart','gesturechange','gestureend'].forEach(e=>document.addEventListener(e,ev=>ev.preventDefault(),{passive:false}));
 let lastTouch=0;document.addEventListener('touchend',e=>{const n=Date.now();if(n-lastTouch<300&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))e.preventDefault();lastTouch=n},{passive:false});
 document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
-let profMode='view';
+let profMode='view',chalMode='view';
 const K='75hard-v1',SCHEMA=3,DEF=[["Workout 1 (45 min)","06:00"],["Workout 2 – OUTDOORS (45 min)","17:00"],["Follow diet – no cheat meals or alcohol","20:00"],["Drink 1 gallon of water","19:00"],["Read 10 pages of nonfiction","21:00"],["Take a progress photo","07:00"]];
 let view='today';
 /* ---------- state + migration (lossless) ---------- */
@@ -144,7 +145,8 @@ async function hydrateToday(){const u=await photoURL(today()).catch(()=>null),el
 function tog(id){const d=day(today()),t=d.tasks.find(x=>String(x.id)===String(id));if(!t)return;t.done=t.done?null:Date.now();if(navigator.vibrate&&t.done)navigator.vibrate(15);save();render()}
 function calHTML(){const t=today();let h=`<div class="card"><h2>75-Day Map</h2><div class="mut" style="margin-bottom:12px">🟩 Complete · 🟥 Incomplete · 🟧 Today · 📷 photo</div><div class="grid">`;
  for(let i=0;i<75;i++){const s=addD(S.start,i),d=S.days[s];const c=s===t?'t':s>t?'f':d&&d.status==='complete'?'c':'x';h+=`<div class="d ${c}" onclick="${c==='f'?'':`show('${s}')`}">${i+1}${photoSet.has(s)?'<i>📷</i>':''}</div>`}
- return h+`</div><p class="mut">${fmtD(S.start)} → ${fmtD(addD(S.start,74))}. Tap a day for its breakdown.</p></div>`+(S.attempts.length?`<div class="card"><h2>Past Attempts</h2>${S.attempts.map((a,i)=>`<div class="row" style="justify-content:space-between"><span>#${i+1} · ${fmtD(a.start)}</span><span class="mut">${Object.values(a.days).filter(d=>d.status==='complete').length} days complete</span></div>`).join('')}</div>`:'')}
+ return h+`</div><p class="mut">${fmtD(S.start)} → ${fmtD(addD(S.start,74))}. Tap a day for its breakdown.</p></div>`+attemptsHTML()}
+function attemptsHTML(){if(!S.attempts||!S.attempts.length)return'';return `<div class="card"><h2>Past Attempts</h2>${S.attempts.map((a,i)=>{const n=Object.values(a.days||{}).filter(d=>d&&d.status==='complete').length;return `<div class="row attempt" style="justify-content:space-between"><div style="flex:1;min-width:0"><div>#${i+1} · ${a.start?fmtD(a.start):'Unknown date'}</div><div class="mut">${n} days complete</div></div><button class="sec" style="flex:0 0 auto;min-height:40px;padding:8px 12px" onclick="deleteAttempt(${i})">Delete</button></div>`}).join('')}</div>`}
 async function show(s){const d=day(s),i=diff(S.start,s)+1,st=s===today()?'In progress':d.status;const u=await photoURL(s).catch(()=>null);
  let h=`<div class="row" style="justify-content:space-between"><div><div class="big">Day ${i}</div><div class="mut">${fmtD(s)}</div></div><span class="pill ${st==='complete'?'c':st==='incomplete'?'x':''}">${esc(st)}</span></div>`;
  byDayTime(d.tasks).forEach(t=>h+=`<div class="task ${t.done?'done':''}" data-id="${esc(t.id)}" style="cursor:default"><div class="box" style="${t.done?'':'border-color:var(--red)'}">${t.done?'<svg viewBox="0 0 24 24" style="stroke-dashoffset:0"><path d="M5 12l5 5 9-10"/></svg>':'<span style="color:var(--red);font-weight:700">✕</span>'}</div><div><div class="tn">${esc(t.name)}</div><div class="mut">${t.done?'Checked '+new Date(t.done).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'Missed'}</div></div></div>`);
@@ -168,17 +170,21 @@ function statsHTML(){const st=stats(),t=today();let past=0;const per={};
  h+=`<div class="card"><h2>Most Missed</h2>${mm?`<div class="big" style="font-size:20px">${esc(mm.name)}</div><div class="mut">missed ${mm.tot-mm.done} of ${mm.tot} days</div>`:'<p class="mut">Nothing missed. Keep it that way.</p>'}</div>`;
  const w=S.weights||[];if(w.length){const f=w[0].kg,l=w[w.length-1].kg;h+=`<div class="card"><h2>Weight</h2><div class="mut">${w.length} entries · latest ${l} · change ${(l-f>0?'+':'')+(Math.round((l-f)*10)/10)}</div></div>`}
  return h+`<p class="mut" style="text-align:center">${S.attempts.length} archived attempt(s)</p>`}
-function setupHTML(first){const ts=byTime(S?S.tasks:DEF.map((d,i)=>({id:'t'+i,name:d[0],time:d[1]}))),p=(S&&S.profile)||{},perm='Notification' in window?Notification.permission:'unsupported';
+function setupHTML(first){const ts=byTime(S?S.tasks:DEF.map((d,i)=>({id:'t'+i,name:d[0],time:d[1]}))),perm='Notification' in window?Notification.permission:'unsupported';
  let h='';if(first)h+=`<div class="card"><div class="big">Set up your 75 Hard</div><p class="mut">Pick your start date and reminder times.</p></div>`;
  if(!first)h+=profileHTML();
- h+=`<div class="card"><h2>Challenge</h2><label class="f"><span>Start date</span><input type="date" id="sd" value="${S?S.start:today()}"></label><div class="tag" style="margin-top:12px">Tasks & reminder times</div><div id="tl">`;
- ts.forEach(t=>h+=`<div class="row" data-id="${t.id}"><input type="text" style="flex:1" value="${esc(t.name)}"><input type="time" style="flex:0 0 112px" value="${t.time}"><button class="sec" style="flex:0 0 48px;padding:0" onclick="this.parentNode.remove()" aria-label="remove">✕</button></div>`);
- h+=`</div><div class="row"><button class="sec" style="flex:1" onclick="addRow()">+ Add task</button><button style="flex:1" onclick="saveSet()">${first?'Start':'Save'}</button></div></div>`;
+ h+=challengeHTML(ts,first);
  h+=`<div class="card"><h2>Reminders</h2><span class="pill">${perm}</span><p class="mut">Fires at each task's time if it isn't checked. <b>Limitation:</b> no push server, so reminders only fire reliably while the app is open or recently backgrounded. iPhone: Add to Home Screen from Safari first, open from there, then enable. Set phone alarms as backup.</p><div class="row"><button style="flex:1" onclick="askPerm()">Enable</button><button class="sec" style="flex:1" onclick="notify('Test reminder','Notifications are working 💪','test')">Test</button></div></div>`;
  if(first)return h;
  h+=`<div class="card"><h2>Backup</h2><p class="mut">Data lives only on this device. Export regularly (includes photos).</p><div class="row"><button class="sec" style="flex:1" onclick="exportData()">⬇ Export</button><button class="sec" style="flex:1" onclick="$('importIn').click()">⬆ Import</button></div></div>
  <div class="card"><h2>The Rules</h2><ol class="rules mut"><li>Follow a diet. No cheat meals, no alcohol.</li><li>Two 45-minute workouts. One must be outdoors.</li><li>Drink one gallon of water.</li><li>Read 10 pages of nonfiction.</li><li>Take a progress photo.</li></ol><p class="mut">Miss anything, any day → back to Day 1. No modifications, no substitutions.</p></div>
  <div class="card warn"><h2>Restart</h2><p class="mut">Starts Day 1 today. Your current attempt is archived in history, never deleted.</p><button onclick="restart()">Restart challenge</button></div><p class="mut" style="text-align:center">75 Hard Tracker · schema v${SCHEMA}</p>`;return h}
+function showTime(t){const n=normT(t);return n?fmtT(n):'—'}
+function challengeHTML(ts,first){if(!first&&chalMode!=='edit')return `<div class="card hero2"><div class="tag" style="color:var(--org)">Challenge</div><div class="pname" style="font-size:28px">${fmtD(S.start)}</div><div class="mut">Start date · ${esc(S.start)} · ${ts.length} daily order${ts.length===1?'':'s'}</div><div class="crows">${ts.map(t=>`<div class="crow" data-id="${esc(t.id)}" data-time="${esc(normT(t.time))}"><span class="tn">${esc(t.name)}</span><span class="tm">${esc(showTime(t.time))}</span></div>`).join('')}</div><button class="sec w" style="margin-top:14px" onclick="chalMode='edit';render()">✎ Edit challenge</button></div>`;
+ let h=`<div class="card${first?'':' pedit'}">${first?'<h2>Challenge</h2>':`<div class="row" style="justify-content:space-between;margin:0 0 6px"><h2 style="margin:0">Edit Challenge</h2><span class="tag">Orders</span></div>`}<label class="f"><span>Start date</span><input type="date" id="sd" value="${S?S.start:today()}"></label><div class="tag" style="margin-top:12px">Tasks & reminder times</div><div id="tl">`;
+ ts.forEach(t=>h+=`<div class="row" data-id="${esc(t.id)}"><input type="text" style="flex:1" value="${esc(t.name)}"><input type="time" style="flex:0 0 112px" value="${esc(t.time)}"><button class="sec" style="flex:0 0 48px;padding:0" onclick="this.parentNode.remove()" aria-label="remove">✕</button></div>`);
+ if(first)return h+`</div><div class="row"><button class="sec" style="flex:1" onclick="addRow()">+ Add task</button><button style="flex:1" onclick="saveSet()">Start</button></div></div>`;
+ return h+`</div><div class="row"><button class="sec" style="flex:1" onclick="addRow()">+ Add task</button></div><div class="row"><button class="ghost" style="flex:1" onclick="chalMode='view';render()">Cancel</button><button style="flex:2" onclick="saveSet()">Save</button></div></div>`}
 function ageStr(dob){if(!dob)return'';const b=new Date(dob+'T12:00'),n=new Date(today()+'T12:00');let y=n.getFullYear()-b.getFullYear();let last=new Date(b);last.setFullYear(b.getFullYear()+y);if(last>n){y--;last=new Date(b);last.setFullYear(b.getFullYear()+y)}const d=Math.round((n-last)/864e5);return y+' years, '+d+' day'+(d===1?'':'s')}
 function initials(n){return(n||'75').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join('')||'75'}
 function profileHTML(){const p=S.profile||{},w=S.weights||[],cur=w.length?w[w.length-1].kg:null,st=stats(),dn=Math.min(Math.max(dayNum(),0),75);
@@ -200,10 +206,14 @@ function addRow(){const r=document.createElement('div');r.className='row';r.data
 function saveProfile(){const g=id=>$(id).value.trim();if(g('pDob')&&g('pDob')>today())return alert('Date of birth can’t be in the future');S.profile={...S.profile,name:g('pName'),dob:g('pDob'),height:g('pHeight'),startW:g('pStartW'),goalW:g('pGoalW'),why:g('pWhy')};save();profMode='view';toast('Profile saved');render()}
 function logW(){const v=parseFloat($('wIn').value);if(!v)return;S.weights=S.weights||[];const t=today(),e=S.weights.find(w=>w.date===t);if(e)e.kg=v;else S.weights.push({date:t,kg:v});save();toast('Weight logged');render()}
 function saveSet(){const tasks=byTime([...document.querySelectorAll('#tl .row')].map(r=>{const i=r.querySelectorAll('input');return{id:r.dataset.id,name:i[0].value.trim(),time:i[1].value||'12:00'}}).filter(t=>t.name));if(!tasks.length)return alert('Add at least one task');
- const sd=$('sd').value||today();if(!S){S=migrate({start:sd,tasks,days:{},fired:{}});save();view='today';loadPhotoSet().then(render);return}
+ const sd=$('sd').value||today();if(!S){S=migrate({start:sd,tasks,days:{},fired:{}});save();view='today';chalMode='view';loadPhotoSet().then(render);return}
  if(sd!==S.start){if(!confirm('Changing the start date archives the current attempt and starts a fresh one. Continue?'))return;archive();S.start=sd}
- S.tasks=tasks;const d=S.days[today()];if(d&&!d.status)d.tasks=tasks.map(t=>({id:t.id,name:t.name,done:(d.tasks.find(x=>x.id===t.id)||{}).done||null}));save();toast('Saved');view='today';render()}
+ S.tasks=tasks;const d=S.days[today()];if(d&&!d.status)d.tasks=tasks.map(t=>({id:t.id,name:t.name,done:(d.tasks.find(x=>x.id===t.id)||{}).done||null}));save();chalMode='view';toast('Saved');render()}
 function archive(){S.attempts.push({aid:S.aid,start:S.start,tasks:S.tasks,days:S.days,endedAt:Date.now()});S.aid='a'+Date.now();S.days={};S.fired={};photoSet=new Set()}
+async function deleteAttempt(i){const list=S&&S.attempts,a=list&&list[i];if(!a)return;if(!confirm('Delete this attempt permanently?'))return;const aid=a.aid;list.splice(i,1);save();
+ try{if(aid&&aid!==S.aid&&!list.some(x=>x&&x.aid===aid)){const ks=await allKeys(),prefix=String(aid)+':',cur=String(S.aid)+':';const mine=ks.filter(k=>typeof k==='string'&&k.startsWith(prefix)&&!k.startsWith(cur));
+  if(mine.length){const d=await db();await new Promise((res,rej)=>{const tx=d.transaction('photos','readwrite'),st=tx.objectStore('photos');mine.forEach(k=>{st.delete(k);if(urlCache[k]){URL.revokeObjectURL(urlCache[k]);delete urlCache[k]}});tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}}}catch(e){}
+ toast('Attempt deleted');render()}
 function restart(){if(!confirm('Restart 75 Hard from Day 1 today? Your current attempt will be archived (kept in history).'))return;archive();S.start=today();save();view='today';render()}
 async function exportData(){try{const d=await db(),out={app:'75hard',schema:SCHEMA,exported:new Date().toISOString(),state:S,photos:{}};const ks=await allKeys();
  for(const k of ks){const b=await getPhoto(k);out.photos[k]=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)})}
@@ -218,7 +228,7 @@ function tick(){$('clock').textContent=new Date().toLocaleTimeString([],{hour:'n
  if(S.lastDay!==today()){S.lastDay=today();save();if(!editing())render()}const n=dayNum();if(n<1||n>75||!('Notification' in window)||Notification.permission!=='granted')return;
  const now=new Date(),h=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),d=day(today());S.fired=S.fired||{};
  S.tasks.forEach(t=>{const k=today()+t.id;if(t.time<=h&&!S.fired[k]){S.fired[k]=1;save();const dt=d.tasks.find(x=>x.id===t.id);if(dt&&!dt.done&&diffMin(t.time,h)<60)notify('75 Hard – Day '+n,t.name,k)}})}
-$('nav').onclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.v){view=b.dataset.v;profMode='view';window.scrollTo(0,0);render()}};
+$('nav').onclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.v){view=b.dataset.v;profMode='view';chalMode='view';window.scrollTo(0,0);render()}};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(!editing())render();tick()}});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 render();if(S)loadPhotoSet().then(()=>{if(!editing())render()});tick();setInterval(tick,20000);
