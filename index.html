@@ -61,7 +61,7 @@ blockquote{margin:14px 0 0;padding:10px 14px;border-left:3px solid var(--red);ba
 html.camon,html.camon body{overflow:hidden;height:100%;overscroll-behavior:none}
 .cam{position:fixed;inset:0;z-index:40;background:#000;display:none;overflow:hidden;touch-action:none}
 .cam.on{display:block}
-.cam video,.cam .still{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;background:#000}
+.cam video,.cam .still{position:absolute;inset:0;width:100%;height:100%;max-width:none;max-height:none;object-fit:cover;object-position:center;background:#000;image-rendering:auto}
 .cam video.mirror{transform:scaleX(-1)}
 .cam .still{display:none}.cam .still.on{display:block}
 .camcount{position:absolute;inset:0;z-index:2;display:none;align-items:center;justify-content:center;font:700 min(42vw,160px)/1 var(--hd);color:#fff;text-shadow:0 10px 40px #000;pointer-events:none}
@@ -134,26 +134,45 @@ async function idb(mode,fn){const d=await db();return new Promise((res,rej)=>{co
 const pKey=s=>S.aid+':'+s;const putPhoto=(k,b)=>idb('readwrite',st=>st.put(b,k));const getPhoto=k=>idb('readonly',st=>st.get(k));const allKeys=()=>idb('readonly',st=>st.getAllKeys());
 let urlCache={};async function photoURL(s){const k=pKey(s);if(urlCache[k])return urlCache[k];const b=await getPhoto(k);return b?(urlCache[k]=URL.createObjectURL(b)):null}
 let photoSet=new Set();async function loadPhotoSet(){try{const ks=await allKeys();photoSet=new Set(ks.filter(k=>k.startsWith(S.aid+':')).map(k=>k.slice(S.aid.length+1)))}catch(e){}}
-async function compress(file){const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file)});
- const sc=Math.min(1,1080/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(img.src);
- return new Promise(r=>c.toBlob(r,'image/jpeg',.82))}
+async function compress(file){const url=URL.createObjectURL(file);try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('Could not read photo'));i.src=url});
+ const sc=Math.min(1,2048/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*sc));c.height=Math.max(1,Math.round(img.height*sc));
+ const x=c.getContext('2d',{alpha:false});x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(img,0,0,c.width,c.height);
+ const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));if(!blob)throw new Error('Could not compress photo');return blob}finally{URL.revokeObjectURL(url)}}
 const canPhoto=s=>!!S&&!!s&&s>=S.start&&s<=today()&&s<=addD(S.start,74);
 const lockMsg=()=>dayNum()<1?'Photos unlock on Day 1 — '+fmtD(S.start):'Photos are only for today and past challenge days';
-let photoDay=null,camFacing='environment',camTimer=0,camStream=null,camTick=null,camBlob=null,camReviewURL=null;
+let photoDay=null,camFacing='environment',camTimer=0,camStream=null,camTick=null,camBlob=null,camReviewURL=null,camHi=null,camShotInfo=null,camGrabbing=false,camGen=0;
 function takePhoto(s){s=s||today();if(!canPhoto(s))return toast(lockMsg());photoDay=s;openCam()}
 function uploadLib(){if(!canPhoto(photoDay||today()))return toast(lockMsg());const day=photoDay;closeCam();photoDay=day;$('photoIn').value='';$('photoIn').click()}
 async function storePhoto(b){const k=pKey(photoDay);await putPhoto(k,b);if(urlCache[k])URL.revokeObjectURL(urlCache[k]);delete urlCache[k];photoSet.add(photoDay);
  const d=day(photoDay);if(!d.status||photoDay===today()){d.tasks.forEach(t=>{if(isPhotoTask(t)&&!t.done)t.done=Date.now()})}save();photoDay=null;toast('Photo saved');closeM();closeCam();render()}
 $('photoIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;photoDay=photoDay||today();if(!canPhoto(photoDay)){photoDay=null;return toast(lockMsg())}try{await storePhoto(await compress(f))}catch(err){alert('Could not save photo: '+err.message)}};
-function stopCamTracks(){if(camStream){camStream.getTracks().forEach(t=>{try{t.stop()}catch(e){}});camStream=null}const v=$('camVid');if(v)v.srcObject=null}
+function stopCamTracks(){camGen++;if(camStream){camStream.getTracks().forEach(t=>{try{t.stop()}catch(e){}});camStream=null}const v=$('camVid');if(v)v.srcObject=null}
 function cancelCamCount(){if(camTick){clearInterval(camTick);camTick=null}const c=$('camCount');if(c){c.classList.remove('on');c.textContent=''}}
 function showCamErr(msg){const el=$('camErr');if(!el)return;el.textContent=msg;el.classList.add('on');const s=$('camShot');if(s)s.disabled=true}
 function clearCamErr(){const el=$('camErr');if(el){el.classList.remove('on');el.textContent=''}const s=$('camShot');if(s)s.disabled=false}
 function closeCam(){cancelCamCount();stopCamTracks();if(camReviewURL){URL.revokeObjectURL(camReviewURL);camReviewURL=null}camBlob=null;const cam=$('cam');if(!cam)return;cam.classList.remove('on','reviewing');cam.setAttribute('aria-hidden','true');document.documentElement.classList.remove('camon');
  const img=$('camStill');if(img){img.classList.remove('on');img.removeAttribute('src')}const rev=$('camReview');if(rev)rev.classList.remove('on');clearCamErr()}
 function beep(){try{if(navigator.vibrate)navigator.vibrate(12)}catch(e){}try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;if(!beep.ctx)beep.ctx=new AC();const ctx=beep.ctx;if(ctx.state!=='running')return;const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=880;o.connect(g);g.connect(ctx.destination);g.gain.setValueAtTime(.0001,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.04,ctx.currentTime+.02);g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.12);o.start();o.stop(ctx.currentTime+.13)}catch(e){}}
-async function startCam(){stopCamTracks();const facing=camFacing==='user'?'user':'environment';let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:facing}})}catch(e){if(!e||e.name!=='OverconstrainedError')throw e;stream=await navigator.mediaDevices.getUserMedia({audio:false,video:true})}
- camStream=stream;const v=$('camVid');v.muted=true;v.defaultMuted=true;v.playsInline=true;v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');v.setAttribute('muted','');v.srcObject=stream;v.classList.toggle('mirror',facing==='user');try{await v.play()}catch(e){}clearCamErr()}
+function camTries(facing){return [
+ {audio:false,video:{facingMode:facing,width:{ideal:3024},height:{ideal:4032},aspectRatio:{ideal:3/4}}},
+ {audio:false,video:{facingMode:facing,width:{ideal:2160},height:{ideal:3840},aspectRatio:{ideal:9/16}}},
+ {audio:false,video:{facingMode:facing,width:{ideal:4032},height:{ideal:3024},aspectRatio:{ideal:4/3}}},
+ {audio:false,video:{facingMode:facing,width:{ideal:3840},height:{ideal:2160},aspectRatio:{ideal:16/9}}},
+ {audio:false,video:{facingMode:facing}},
+ {audio:false,video:true}]}
+async function openStream(facing){let err;for(const c of camTries(facing)){try{return await navigator.mediaDevices.getUserMedia(c)}catch(e){err=e;const n=e&&e.name;if(n==='NotAllowedError'||n==='SecurityError'||n==='NotReadableError')throw e;if(n!=='OverconstrainedError'&&n!=='ConstraintNotSatisfiedError'&&n!=='NotFoundError')throw e}}throw err||new Error('camera')}
+async function boostTrack(track){camHi=null;if(!track||typeof track.getCapabilities!=='function')return;let caps;try{caps=track.getCapabilities()}catch(e){return}
+ const maxW=caps&&caps.width&&caps.width.max||0,maxH=caps&&caps.height&&caps.height.max||0;camHi={maxW,maxH,applied:false};if((!maxW&&!maxH)||typeof track.applyConstraints!=='function')return;
+ const next={};if(maxW)next.width={ideal:maxW};if(maxH)next.height={ideal:maxH};
+ const ar=caps.aspectRatio,portrait=3/4;if(ar&&portrait>=(ar.min||0)&&portrait<=(ar.max||portrait))next.aspectRatio={ideal:portrait};
+ try{await track.applyConstraints(next);camHi.applied=true}catch(e){try{const size={};if(maxW)size.width={ideal:maxW};if(maxH)size.height={ideal:maxH};await track.applyConstraints(size);camHi.applied=true}catch(e2){camHi.applied=false}}}
+function syncPreview(v){const w=v.videoWidth,h=v.videoHeight;if(!w||!h)return;v.width=w;v.height=h;v.style.width='100%';v.style.height='100%';v.style.objectFit='cover'}
+function previewReady(v){if(!v.videoWidth||!v.videoHeight)return false;if(!camHi||!camHi.applied)return true;return (!camHi.maxW||v.videoWidth>=camHi.maxW)&&(!camHi.maxH||v.videoHeight>=camHi.maxH)}
+function settlePreview(v){if(previewReady(v))return Promise.resolve();return new Promise(res=>{let done=false;const t0=Date.now();const finish=()=>{if(done)return;if(!previewReady(v)&&Date.now()<t0+700)return;done=true;v.removeEventListener('resize',finish);clearInterval(id);res()};v.addEventListener('resize',finish);const id=setInterval(finish,40)})}
+async function startCam(){stopCamTracks();const gen=camGen,facing=camFacing==='user'?'user':'environment';const stream=await openStream(facing);
+ if(gen!==camGen){stream.getTracks().forEach(t=>{try{t.stop()}catch(e){}});return}
+ camStream=stream;const v=$('camVid');v.muted=true;v.defaultMuted=true;v.playsInline=true;v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');v.setAttribute('muted','');v.srcObject=stream;v.classList.toggle('mirror',facing==='user');try{await v.play()}catch(e){}
+ if(gen!==camGen)return;await boostTrack(stream.getVideoTracks()[0]);await settlePreview(v);if(gen!==camGen)return;syncPreview(v);clearCamErr()}
 async function openCam(){closeCam();photoDay=photoDay;$('cam').classList.add('on');$('cam').setAttribute('aria-hidden','false');document.documentElement.classList.add('camon');
  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){showCamErr('Camera is not supported here. Upload from library instead.');return}
  try{await startCam()}catch(e){showCamErr(e&&e.name==='NotAllowedError'?'Camera permission denied. Upload from library instead.':'Could not open the camera. Upload from library instead.')}}
@@ -161,9 +180,13 @@ async function flipCam(){if(!$('cam').classList.contains('on')||$('cam').classLi
 function setCamTimer(sec){cancelCamCount();camTimer=sec;document.querySelectorAll('#camTimers button').forEach(b=>b.classList.toggle('on',+b.dataset.sec===sec))}
 function armShutter(){if(!$('cam').classList.contains('on')||$('cam').classList.contains('reviewing')||camTick)return;if(!camStream){showCamErr('Camera is not available. Upload from library instead.');return}
  if(!camTimer){snap();return}let n=camTimer;const show=()=>{const c=$('camCount');c.textContent=String(n);c.classList.add('on');beep()};show();camTick=setInterval(()=>{n--;if(n<=0){cancelCamCount();snap()}else show()},1000)}
-function snap(){const v=$('camVid');if(!v.videoWidth||!v.videoHeight){showCamErr('Camera is not ready. Try again or upload from library.');return}
- const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0,c.width,c.height);
- c.toBlob(b=>{if(!$('cam').classList.contains('on'))return;if(!b){showCamErr('Could not capture a photo.');return}camBlob=b;if(camReviewURL)URL.revokeObjectURL(camReviewURL);camReviewURL=URL.createObjectURL(b);const img=$('camStill');img.src=camReviewURL;img.classList.add('on');$('camReview').classList.add('on');$('cam').classList.add('reviewing');stopCamTracks()},'image/jpeg',.92)}
+function showReview(b){if(!$('cam').classList.contains('on'))return;if(!b){showCamErr('Could not capture a photo.');return}camBlob=b;if(camReviewURL)URL.revokeObjectURL(camReviewURL);camReviewURL=URL.createObjectURL(b);const img=$('camStill');img.onload=()=>{img.width=img.naturalWidth;img.height=img.naturalHeight};img.src=camReviewURL;img.classList.add('on');$('camReview').classList.add('on');$('cam').classList.add('reviewing');stopCamTracks()}
+async function grabFrame(){const v=$('camVid');const track=camStream&&camStream.getVideoTracks()[0];const w=v.videoWidth,h=v.videoHeight;
+ if(track&&typeof ImageCapture==='function'){try{const ic=new ImageCapture(track);if(typeof ic.takePhoto==='function'){const b=await ic.takePhoto();if(b&&b.size){camShotInfo={via:'imagecapture',videoWidth:w,videoHeight:h};return b}}}catch(e){}}
+ if(!w||!h){showCamErr('Camera is not ready. Try again or upload from library.');return null}
+ const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{alpha:false});x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(v,0,0,w,h);
+ camShotInfo={via:'canvas',videoWidth:w,videoHeight:h};return await new Promise(r=>c.toBlob(r,'image/jpeg',.95))}
+function snap(){if(camGrabbing)return;camGrabbing=true;grabFrame().then(b=>{if(b)showReview(b)}).catch(()=>{if($('cam').classList.contains('on'))showCamErr('Could not capture a photo.')}).finally(()=>{camGrabbing=false})}
 async function retakeCam(){if(camReviewURL){URL.revokeObjectURL(camReviewURL);camReviewURL=null}camBlob=null;$('camStill').classList.remove('on');$('camStill').removeAttribute('src');$('camReview').classList.remove('on');$('cam').classList.remove('reviewing');try{await startCam()}catch(e){showCamErr('Camera permission denied. Upload from library instead.')}}
 async function useCam(){if(!camBlob)return;if(!canPhoto(photoDay)){closeCam();return toast(lockMsg())}try{await storePhoto(await compress(camBlob))}catch(err){alert('Could not save photo: '+err.message)}}
 /* ---------- challenge logic ---------- */
