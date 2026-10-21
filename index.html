@@ -58,13 +58,42 @@ blockquote{margin:14px 0 0;padding:10px 14px;border-left:3px solid var(--red);ba
 .pedit{border-color:#3a2a20;background:linear-gradient(180deg,#1d1612,var(--card))}.pedit input:focus,.pedit textarea:focus{outline:none;border-color:var(--org);box-shadow:0 0 0 3px #ff8a0033}
 .crows{margin-top:14px}.crow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}.crow:last-child{border-bottom:0}.crow .tn{overflow-wrap:anywhere}.crow .tm{font:700 15px var(--hd);letter-spacing:.5px;color:var(--org);flex:0 0 auto}
 .lock{text-align:center;padding:36px 18px;background:repeating-linear-gradient(135deg,#ffffff04 0 2px,transparent 2px 10px),linear-gradient(180deg,var(--card2),var(--card))}.lockic{font-size:46px;filter:drop-shadow(0 0 14px #ff8a0066);margin-bottom:6px}
+html.camon,html.camon body{overflow:hidden;height:100%;overscroll-behavior:none}
+.cam{position:fixed;inset:0;z-index:40;background:#000;display:none;overflow:hidden;touch-action:none}
+.cam.on{display:block}
+.cam video,.cam .still{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;background:#000}
+.cam video.mirror{transform:scaleX(-1)}
+.cam .still{display:none}.cam .still.on{display:block}
+.camcount{position:absolute;inset:0;z-index:2;display:none;align-items:center;justify-content:center;font:700 min(42vw,160px)/1 var(--hd);color:#fff;text-shadow:0 10px 40px #000;pointer-events:none}
+.camcount.on{display:flex}
+.camtop,.cambot,.camreview{position:absolute;left:0;right:0;z-index:3;display:flex;align-items:center;gap:8px}
+.camtop{top:0;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left))}
+.cambot{bottom:0;justify-content:space-between;padding:12px max(16px,env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.camreview{bottom:0;display:none;justify-content:center;padding:12px max(16px,env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.camreview.on{display:flex}.cam.reviewing .cambot{visibility:hidden}
+.cam button{min-height:44px;padding:8px 12px;background:#14161acc;color:#fff;border:1px solid #ffffff2a;touch-action:manipulation}
+.camtimers{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.camtimers button{min-height:36px;padding:6px 8px}
+.camtimers button.on{background:var(--org);color:#111;border-color:var(--org)}
+#camShot{width:76px;height:76px;min-width:76px;min-height:76px;border-radius:50%;padding:0;background:#fff;color:#111;border:6px solid #ffffff66}
+.camerr{position:absolute;left:28px;right:28px;top:40%;z-index:3;display:none;text-align:center;color:#fff;font-size:16px;line-height:1.4}
+.camerr.on{display:block}
 </style></head><body>
 <header><h1>75 <b>Hard</b></h1><span class="tag" id="clock"></span></header>
 <main id="app"></main>
 <nav id="nav"></nav>
 <div class="modal" id="modal" onclick="if(event.target===this)closeM()"><div class="card" id="mbody"></div></div>
 <div class="toast" id="toast"></div>
-<input type="file" id="photoIn" accept="image/*" capture="environment" hidden>
+<div id="cam" class="cam" aria-hidden="true">
+<video id="camVid" playsinline webkit-playsinline muted autoplay></video>
+<img id="camStill" class="still" alt="">
+<div id="camCount" class="camcount"></div>
+<div class="camtop"><button type="button" id="camClose" onclick="closeCam()">Close</button><div id="camTimers" class="camtimers"><button type="button" data-sec="0" class="on" onclick="setCamTimer(0)">Off</button><button type="button" data-sec="3" onclick="setCamTimer(3)">3s</button><button type="button" data-sec="5" onclick="setCamTimer(5)">5s</button><button type="button" data-sec="10" onclick="setCamTimer(10)">10s</button></div></div>
+<p id="camErr" class="camerr"></p>
+<div class="cambot"><button type="button" class="sec" id="camLib" onclick="uploadLib()">Upload from library</button><button type="button" id="camShot" onclick="armShutter()" aria-label="Shutter"></button><button type="button" class="sec" id="camFlip" onclick="flipCam()" aria-label="Flip camera">Flip</button></div>
+<div id="camReview" class="camreview"><button type="button" class="sec" id="camRetake" onclick="retakeCam()">Retake</button><button type="button" id="camUse" onclick="useCam()">Use photo</button></div>
+</div>
+<input type="file" id="photoIn" accept="image/*" hidden>
 <input type="file" id="importIn" accept="application/json,.json" hidden>
 <script>
 ['gesturestart','gesturechange','gestureend'].forEach(e=>document.addEventListener(e,ev=>ev.preventDefault(),{passive:false}));
@@ -110,9 +139,33 @@ async function compress(file){const img=await new Promise((res,rej)=>{const i=ne
  return new Promise(r=>c.toBlob(r,'image/jpeg',.82))}
 const canPhoto=s=>!!S&&!!s&&s>=S.start&&s<=today()&&s<=addD(S.start,74);
 const lockMsg=()=>dayNum()<1?'Photos unlock on Day 1 — '+fmtD(S.start):'Photos are only for today and past challenge days';
-let photoDay=null;function takePhoto(s){s=s||today();if(!canPhoto(s))return toast(lockMsg());photoDay=s;$('photoIn').value='';$('photoIn').click()}
-$('photoIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;photoDay=photoDay||today();if(!canPhoto(photoDay)){photoDay=null;return toast(lockMsg())}try{const b=await compress(f);const k=pKey(photoDay);await putPhoto(k,b);if(urlCache[k])URL.revokeObjectURL(urlCache[k]);delete urlCache[k];photoSet.add(photoDay);
- const d=day(photoDay);if(!d.status||photoDay===today()){d.tasks.forEach(t=>{if(isPhotoTask(t)&&!t.done)t.done=Date.now()})}save();photoDay=null;toast('Photo saved');closeM();render()}catch(err){alert('Could not save photo: '+err.message)}};
+let photoDay=null,camFacing='environment',camTimer=0,camStream=null,camTick=null,camBlob=null,camReviewURL=null;
+function takePhoto(s){s=s||today();if(!canPhoto(s))return toast(lockMsg());photoDay=s;openCam()}
+function uploadLib(){if(!canPhoto(photoDay||today()))return toast(lockMsg());const day=photoDay;closeCam();photoDay=day;$('photoIn').value='';$('photoIn').click()}
+async function storePhoto(b){const k=pKey(photoDay);await putPhoto(k,b);if(urlCache[k])URL.revokeObjectURL(urlCache[k]);delete urlCache[k];photoSet.add(photoDay);
+ const d=day(photoDay);if(!d.status||photoDay===today()){d.tasks.forEach(t=>{if(isPhotoTask(t)&&!t.done)t.done=Date.now()})}save();photoDay=null;toast('Photo saved');closeM();closeCam();render()}
+$('photoIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;photoDay=photoDay||today();if(!canPhoto(photoDay)){photoDay=null;return toast(lockMsg())}try{await storePhoto(await compress(f))}catch(err){alert('Could not save photo: '+err.message)}};
+function stopCamTracks(){if(camStream){camStream.getTracks().forEach(t=>{try{t.stop()}catch(e){}});camStream=null}const v=$('camVid');if(v)v.srcObject=null}
+function cancelCamCount(){if(camTick){clearInterval(camTick);camTick=null}const c=$('camCount');if(c){c.classList.remove('on');c.textContent=''}}
+function showCamErr(msg){const el=$('camErr');if(!el)return;el.textContent=msg;el.classList.add('on');const s=$('camShot');if(s)s.disabled=true}
+function clearCamErr(){const el=$('camErr');if(el){el.classList.remove('on');el.textContent=''}const s=$('camShot');if(s)s.disabled=false}
+function closeCam(){cancelCamCount();stopCamTracks();if(camReviewURL){URL.revokeObjectURL(camReviewURL);camReviewURL=null}camBlob=null;const cam=$('cam');if(!cam)return;cam.classList.remove('on','reviewing');cam.setAttribute('aria-hidden','true');document.documentElement.classList.remove('camon');
+ const img=$('camStill');if(img){img.classList.remove('on');img.removeAttribute('src')}const rev=$('camReview');if(rev)rev.classList.remove('on');clearCamErr()}
+function beep(){try{if(navigator.vibrate)navigator.vibrate(12)}catch(e){}try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;if(!beep.ctx)beep.ctx=new AC();const ctx=beep.ctx;if(ctx.state!=='running')return;const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=880;o.connect(g);g.connect(ctx.destination);g.gain.setValueAtTime(.0001,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.04,ctx.currentTime+.02);g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.12);o.start();o.stop(ctx.currentTime+.13)}catch(e){}}
+async function startCam(){stopCamTracks();const facing=camFacing==='user'?'user':'environment';let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:facing}})}catch(e){if(!e||e.name!=='OverconstrainedError')throw e;stream=await navigator.mediaDevices.getUserMedia({audio:false,video:true})}
+ camStream=stream;const v=$('camVid');v.muted=true;v.defaultMuted=true;v.playsInline=true;v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');v.setAttribute('muted','');v.srcObject=stream;v.classList.toggle('mirror',facing==='user');try{await v.play()}catch(e){}clearCamErr()}
+async function openCam(){closeCam();photoDay=photoDay;$('cam').classList.add('on');$('cam').setAttribute('aria-hidden','false');document.documentElement.classList.add('camon');
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){showCamErr('Camera is not supported here. Upload from library instead.');return}
+ try{await startCam()}catch(e){showCamErr(e&&e.name==='NotAllowedError'?'Camera permission denied. Upload from library instead.':'Could not open the camera. Upload from library instead.')}}
+async function flipCam(){if(!$('cam').classList.contains('on')||$('cam').classList.contains('reviewing'))return;camFacing=camFacing==='user'?'environment':'user';try{await startCam()}catch(e){showCamErr('Could not switch cameras. Upload from library instead.')}}
+function setCamTimer(sec){cancelCamCount();camTimer=sec;document.querySelectorAll('#camTimers button').forEach(b=>b.classList.toggle('on',+b.dataset.sec===sec))}
+function armShutter(){if(!$('cam').classList.contains('on')||$('cam').classList.contains('reviewing')||camTick)return;if(!camStream){showCamErr('Camera is not available. Upload from library instead.');return}
+ if(!camTimer){snap();return}let n=camTimer;const show=()=>{const c=$('camCount');c.textContent=String(n);c.classList.add('on');beep()};show();camTick=setInterval(()=>{n--;if(n<=0){cancelCamCount();snap()}else show()},1000)}
+function snap(){const v=$('camVid');if(!v.videoWidth||!v.videoHeight){showCamErr('Camera is not ready. Try again or upload from library.');return}
+ const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+ c.toBlob(b=>{if(!$('cam').classList.contains('on'))return;if(!b){showCamErr('Could not capture a photo.');return}camBlob=b;if(camReviewURL)URL.revokeObjectURL(camReviewURL);camReviewURL=URL.createObjectURL(b);const img=$('camStill');img.src=camReviewURL;img.classList.add('on');$('camReview').classList.add('on');$('cam').classList.add('reviewing');stopCamTracks()},'image/jpeg',.92)}
+async function retakeCam(){if(camReviewURL){URL.revokeObjectURL(camReviewURL);camReviewURL=null}camBlob=null;$('camStill').classList.remove('on');$('camStill').removeAttribute('src');$('camReview').classList.remove('on');$('cam').classList.remove('reviewing');try{await startCam()}catch(e){showCamErr('Camera permission denied. Upload from library instead.')}}
+async function useCam(){if(!camBlob)return;if(!canPhoto(photoDay)){closeCam();return toast(lockMsg())}try{await storePhoto(await compress(camBlob))}catch(err){alert('Could not save photo: '+err.message)}}
 /* ---------- challenge logic ---------- */
 function day(s){if(!S.days[s])S.days[s]={tasks:S.tasks.map(t=>({id:t.id,name:t.name,done:null})),status:null};return S.days[s]}
 const dayNum=()=>diff(S.start,today())+1;
@@ -227,8 +280,10 @@ function tick(){$('clock').textContent=new Date().toLocaleTimeString([],{hour:'n
  if(S.lastDay!==today()){S.lastDay=today();save();if(!editing())render()}const n=dayNum();if(n<1||n>75||!('Notification' in window)||Notification.permission!=='granted')return;
  const now=new Date(),h=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),d=day(today());S.fired=S.fired||{};
  S.tasks.forEach(t=>{const k=today()+t.id;if(t.time<=h&&!S.fired[k]){S.fired[k]=1;save();const dt=d.tasks.find(x=>x.id===t.id);if(dt&&!dt.done&&diffMin(t.time,h)<60)notify('75 Hard – Day '+n,t.name,k)}})}
-$('nav').onclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.v){view=b.dataset.v;profMode='view';chalMode='view';window.scrollTo(0,0);render()}};
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(!editing())render();tick()}});
+$('nav').onclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.v){closeCam();view=b.dataset.v;profMode='view';chalMode='view';window.scrollTo(0,0);render()}};
+function onVis(){if(document.hidden){cancelCamCount();stopCamTracks();return}if($('cam')&&$('cam').classList.contains('on')&&!$('cam').classList.contains('reviewing'))startCam().catch(()=>{});if(!editing())render();tick()}
+document.addEventListener('visibilitychange',onVis);
+window.addEventListener('pagehide',()=>{cancelCamCount();stopCamTracks()});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 render();if(S)loadPhotoSet().then(()=>{if(!editing())render()});tick();setInterval(tick,20000);
 </script></body></html>
