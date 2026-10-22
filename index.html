@@ -158,21 +158,37 @@ function uploadLib(){if(!canPhoto(photoDay||today()))return toast(lockMsg());con
 async function storePhoto(b){const k=pKey(photoDay);await putPhoto(k,b);if(urlCache[k])URL.revokeObjectURL(urlCache[k]);delete urlCache[k];photoSet.add(photoDay);
  const d=day(photoDay);if(!d.status||photoDay===today()){d.tasks.forEach(t=>{if(isPhotoTask(t)&&!t.done)t.done=Date.now()})}save();photoDay=null;toast('Photo saved');closeM();closeCam();render()}
 $('photoIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;photoDay=photoDay||today();if(!canPhoto(photoDay)){photoDay=null;return toast(lockMsg())}try{await storePhoto(await compress(f))}catch(err){alert('Could not save photo: '+err.message)}};
-function stopCamTracks(){camGen++;if(camStream){camStream.getTracks().forEach(t=>{try{t.stop()}catch(e){}});camStream=null}const v=$('camVid');if(v)v.srcObject=null}
+function stopCamTracks(){camGen++;const v=$('camVid');const streams=[];if(camStream)streams.push(camStream);if(v&&v.srcObject&&streams.indexOf(v.srcObject)<0)streams.push(v.srcObject);
+ streams.forEach(s=>{try{s.getTracks().forEach(t=>{try{t.stop()}catch(e){}})}catch(e){}});camStream=null;if(v){try{v.pause()}catch(e){}v.srcObject=null}}
 function cancelCamCount(){if(camTick){clearInterval(camTick);camTick=null}const c=$('camCount');if(c){c.classList.remove('on');c.textContent=''}}
 function showCamErr(msg){const el=$('camErr');if(!el)return;el.textContent=msg;el.classList.add('on');const s=$('camShot');if(s)s.disabled=true}
 function clearCamErr(){const el=$('camErr');if(el){el.classList.remove('on');el.textContent=''}const s=$('camShot');if(s)s.disabled=false}
 function closeCam(){cancelCamCount();stopCamTracks();if(camReviewURL){URL.revokeObjectURL(camReviewURL);camReviewURL=null}camBlob=null;const cam=$('cam');if(!cam)return;cam.classList.remove('on','reviewing');cam.setAttribute('aria-hidden','true');document.documentElement.classList.remove('camon');
  const img=$('camStill');if(img){img.classList.remove('on');img.removeAttribute('src')}const rev=$('camReview');if(rev)rev.classList.remove('on');clearCamErr()}
 function beep(){try{if(navigator.vibrate)navigator.vibrate(12)}catch(e){}try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;if(!beep.ctx)beep.ctx=new AC();const ctx=beep.ctx;if(ctx.state!=='running')return;const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=880;o.connect(g);g.connect(ctx.destination);g.gain.setValueAtTime(.0001,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.04,ctx.currentTime+.02);g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.12);o.start();o.stop(ctx.currentTime+.13)}catch(e){}}
-function camTries(facing){return [
- {audio:false,video:{facingMode:facing,width:{ideal:3024},height:{ideal:4032},aspectRatio:{ideal:3/4}}},
- {audio:false,video:{facingMode:facing,width:{ideal:2160},height:{ideal:3840},aspectRatio:{ideal:9/16}}},
- {audio:false,video:{facingMode:facing,width:{ideal:4032},height:{ideal:3024},aspectRatio:{ideal:4/3}}},
- {audio:false,video:{facingMode:facing,width:{ideal:3840},height:{ideal:2160},aspectRatio:{ideal:16/9}}},
- {audio:false,video:{facingMode:facing}},
- {audio:false,video:true}]}
-async function openStream(facing){let err;for(const c of camTries(facing)){try{return await navigator.mediaDevices.getUserMedia(c)}catch(e){err=e;const n=e&&e.name;if(n==='NotAllowedError'||n==='SecurityError'||n==='NotReadableError')throw e;if(n!=='OverconstrainedError'&&n!=='ConstraintNotSatisfiedError'&&n!=='NotFoundError')throw e}}throw err||new Error('camera')}
+const camWait=ms=>new Promise(r=>setTimeout(r,ms));
+function camFace(facing){return {ideal:facing==='user'?'user':'environment'}}
+function camTries(facing){const face=camFace(facing),loose=[
+ {audio:false,video:{facingMode:face,width:{ideal:1920},height:{ideal:1080}}},
+ {audio:false,video:{facingMode:face}},
+ {audio:false,video:true}];
+ if(facing==='user')return loose;
+ return [
+ {audio:false,video:{facingMode:face,width:{ideal:3024},height:{ideal:4032},aspectRatio:{ideal:3/4}}},
+ {audio:false,video:{facingMode:face,width:{ideal:2160},height:{ideal:3840},aspectRatio:{ideal:9/16}}},
+ {audio:false,video:{facingMode:face,width:{ideal:4032},height:{ideal:3024},aspectRatio:{ideal:4/3}}},
+ {audio:false,video:{facingMode:face,width:{ideal:3840},height:{ideal:2160},aspectRatio:{ideal:16/9}}},
+ ...loose]}
+async function camDeviceId(facing){if(!navigator.mediaDevices||!navigator.mediaDevices.enumerateDevices)return '';
+ let all=[];try{all=await navigator.mediaDevices.enumerateDevices()}catch(e){return ''}
+ const vids=all.filter(d=>d&&d.kind==='videoinput'&&d.deviceId&&d.label);
+ const re=facing==='user'?/front|user|face/i:/back|rear|environment/i;
+ const hit=vids.find(d=>re.test(d.label));return hit?hit.deviceId:''}
+async function openStream(facing){let err;const id=await camDeviceId(facing),face=camFace(facing),tries=[];
+ if(id)tries.push({audio:false,video:{deviceId:{exact:id},facingMode:face,width:{ideal:facing==='user'?1920:4032},height:{ideal:facing==='user'?1080:3024}}});
+ tries.push(...camTries(facing));
+ for(const c of tries){try{return await navigator.mediaDevices.getUserMedia(c)}catch(e){err=e;const n=e&&e.name;if(n==='NotAllowedError'||n==='SecurityError')throw e;if(n==='NotReadableError')await camWait(200);if(n!=='OverconstrainedError'&&n!=='ConstraintNotSatisfiedError'&&n!=='NotFoundError'&&n!=='NotReadableError'&&n!=='AbortError')throw e}}
+ throw err||Object.assign(new Error('camera'),{name:'Error'})}
 async function boostTrack(track){camHi=null;if(!track||typeof track.getCapabilities!=='function')return;let caps;try{caps=track.getCapabilities()}catch(e){return}
  const maxW=caps&&caps.width&&caps.width.max||0,maxH=caps&&caps.height&&caps.height.max||0;camHi={maxW,maxH,applied:false};if((!maxW&&!maxH)||typeof track.applyConstraints!=='function')return;
  const next={};if(maxW)next.width={ideal:maxW};if(maxH)next.height={ideal:maxH};
@@ -181,14 +197,16 @@ async function boostTrack(track){camHi=null;if(!track||typeof track.getCapabilit
 function syncPreview(v){const w=v.videoWidth,h=v.videoHeight;if(!w||!h)return;v.width=w;v.height=h;v.style.width='100%';v.style.height='100%';v.style.objectFit='cover'}
 function previewReady(v){if(!v.videoWidth||!v.videoHeight)return false;if(!camHi||!camHi.applied)return true;return (!camHi.maxW||v.videoWidth>=camHi.maxW)&&(!camHi.maxH||v.videoHeight>=camHi.maxH)}
 function settlePreview(v){if(previewReady(v))return Promise.resolve();return new Promise(res=>{let done=false;const t0=Date.now();const finish=()=>{if(done)return;if(!previewReady(v)&&Date.now()<t0+700)return;done=true;v.removeEventListener('resize',finish);clearInterval(id);res()};v.addEventListener('resize',finish);const id=setInterval(finish,40)})}
-async function startCam(){stopCamTracks();const gen=camGen,facing=camFacing==='user'?'user':'environment';const stream=await openStream(facing);
+async function startCam(){stopCamTracks();const gen=camGen,facing=camFacing==='user'?'user':'environment';await camWait(200);if(gen!==camGen)return;const stream=await openStream(facing);
  if(gen!==camGen){stream.getTracks().forEach(t=>{try{t.stop()}catch(e){}});return}
  camStream=stream;const v=$('camVid');v.muted=true;v.defaultMuted=true;v.playsInline=true;v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');v.setAttribute('muted','');v.srcObject=stream;v.classList.toggle('mirror',facing==='user');try{await v.play()}catch(e){}
- if(gen!==camGen)return;await boostTrack(stream.getVideoTracks()[0]);await settlePreview(v);if(gen!==camGen)return;syncPreview(v);clearCamErr()}
+ if(gen!==camGen)return;if(facing==='environment')await boostTrack(stream.getVideoTracks()[0]);else camHi=null;await settlePreview(v);if(gen!==camGen)return;syncPreview(v);clearCamErr()}
+function camFail(e,flip){const name=e&&(e.name||e.message)||'Error';if(e&&e.name==='NotAllowedError')return 'Camera permission denied. Upload from library instead.';
+ return (flip?'Could not switch cameras':'Could not open the camera')+' ('+name+'). Upload from library instead.'}
 async function openCam(){closeCam();photoDay=photoDay;$('cam').classList.add('on');$('cam').setAttribute('aria-hidden','false');document.documentElement.classList.add('camon');
  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){showCamErr('Camera is not supported here. Upload from library instead.');return}
- try{await startCam()}catch(e){showCamErr(e&&e.name==='NotAllowedError'?'Camera permission denied. Upload from library instead.':'Could not open the camera. Upload from library instead.')}}
-async function flipCam(){if(!$('cam').classList.contains('on')||$('cam').classList.contains('reviewing'))return;camFacing=camFacing==='user'?'environment':'user';try{await startCam()}catch(e){showCamErr('Could not switch cameras. Upload from library instead.')}}
+ try{await startCam()}catch(e){showCamErr(camFail(e,false))}}
+async function flipCam(){if(!$('cam').classList.contains('on')||$('cam').classList.contains('reviewing')||camGrabbing)return;camFacing=camFacing==='user'?'environment':'user';try{await startCam()}catch(e){showCamErr(camFail(e,true))}}
 function setCamTimer(sec){cancelCamCount();camTimer=sec;document.querySelectorAll('#camTimers button').forEach(b=>b.classList.toggle('on',+b.dataset.sec===sec))}
 function armShutter(){if(!$('cam').classList.contains('on')||$('cam').classList.contains('reviewing')||camTick)return;if(!camStream){showCamErr('Camera is not available. Upload from library instead.');return}
  if(!camTimer){snap();return}let n=camTimer;const show=()=>{const c=$('camCount');c.textContent=String(n);c.classList.add('on');beep()};show();camTick=setInterval(()=>{n--;if(n<=0){cancelCamCount();snap()}else show()},1000)}
