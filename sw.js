@@ -1,6 +1,6 @@
-const C='75h-v13',F=['./','./index.html','./manifest.json','./icon.svg','./apple-touch-icon.png'];
+const C='75h-v14',F=['./','./index.html','./manifest.json','./icon.svg','./apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(F)));self.skipWaiting()});
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
-self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>caches.match(e.request))));
+self.addEventListener('fetch',e=>{try{const h=new URL(e.request.url).hostname;if(/(^|\.)youtube\.com$|(^|\.)youtube-nocookie\.com$|(^|\.)youtu\.be$|(^|\.)googlevideo\.com$|(^|\.)ytimg\.com$/.test(h))return}catch(err){}e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))});
 self.addEventListener('message',e=>{if(e.data&&e.data.type==='notify')self.registration.showNotification(e.data.title,{body:e.data.body,icon:'icon.svg',tag:e.data.tag,badge:'icon.svg'})});
 self.addEventListener('notificationclick',e=>{e.notification.close();e.waitUntil(self.clients.matchAll({type:'window'}).then(l=>l.length?l[0].focus():self.clients.openWindow('./')))});
