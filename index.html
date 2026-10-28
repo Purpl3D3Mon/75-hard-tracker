@@ -264,6 +264,7 @@ function taskRole(name){const n=String(name||'').toLowerCase();if(/photo/.test(n
 function taskFor(role){return (S.tasks||[]).find(t=>taskRole(t.name)===role)||null}
 function schedBag(){if(!S.sched||typeof S.sched!=='object'||Array.isArray(S.sched))S.sched={};const k=today();if(!S.sched[k]||typeof S.sched[k]!=='object'||Array.isArray(S.sched[k]))S.sched[k]={};return S.sched[k]}
 function togSched(id){const b=schedBag();b[id]=b[id]?null:Date.now();if(navigator.vibrate&&b[id])navigator.vibrate(12);save();render()}
+function openSauna(){openM(`<div class="howgrab"></div><div class="tag" style="color:var(--org)">Schedule</div><h2 style="margin:4px 0 10px">Finnleo sauna</h2><p style="margin:0 0 8px">Target about 175°F (80°C). After the night workout, do one 12–15 minute sit, or two rounds of 10–12 minutes with a cool shower between.</p><ul class="howcues"><li>Drink water before and after. It counts toward the gallon.</li><li>Skip it if you feel dizzy, overheated, or you are short on time.</li><li>Cool down a few minutes, then dinner at 7:20–7:40. Dinner used to be 7:15–7:30; it moved back so the sauna fits after the lift.</li></ul><p class="mut">This is a schedule check. Leaving it unchecked does not miss the day.</p><button type="button" class="ghost w" style="margin-top:8px" onclick="closeM()">Close</button>`)}
 function schedDone(id){const b=S.sched&&S.sched[today()];return !!(b&&b[id])}
 function mergePlanExtras(prev,next){const byId=new Map(),byName=new Map();(prev||[]).forEach(d=>(d.exercises||[]).forEach(e=>{if(!e)return;const extra={};Object.keys(e).forEach(k=>{if(k!=='id'&&k!=='name'&&k!=='sets'&&k!=='reps'&&k!=='cardio'&&k!=='lb')extra[k]=e[k]});if(!Object.keys(extra).length)return;if(e.id)byId.set(e.id,extra);const nm=String(e.name||'').trim().toLowerCase();if(nm&&!byName.has(nm))byName.set(nm,extra)}));next.forEach(d=>(d.exercises||[]).forEach(e=>{const extra=byId.get(e.id)||byName.get(String(e.name||'').trim().toLowerCase());if(extra)Object.assign(e,extra)}));return next}
 function plan(){if(!S.plan||!S.plan.length)S.plan=defPlan();return S.plan}
@@ -427,7 +428,8 @@ function scheduleHTML(){const d=day(today()),bag=S.sched&&S.sched[today()]||{};c
  if(diet&&!dietLate)h+=rowTask(fmtT(taskFor('diet').time),'Diet','diet');
  h+=`<div class="tag" style="margin-top:12px">Evening</div>`;
  h+=rowTask('6:30 PM','Night weights + push-ups + abs','lift',doneTask('lift')?`<button type="button" class="sec" style="min-height:36px;padding:6px 10px;flex:0 0 auto" onclick="event.stopPropagation();openTonight()">Log</button>`:'');
- h+=opt('7:15–7:30 PM','dinner','Dinner');
+ h+=schedRow('7:00–7:20 PM','Sauna','<span class="pill sch">Schedule</span> Finnleo · ~175°F (80°C) · one 12–15 min sit, or 2×10–12 with a cool shower',!!bag.sauna,`togSched('sauna')`,`<button type="button" class="howbtn" onclick="event.stopPropagation();openSauna()">How to</button>`);
+ h+=schedRow('7:20–7:40 PM','Dinner','<span class="pill sch">Schedule</span> Not a challenge task. After the sauna — was 7:15–7:30.',!!bag.dinner,`togSched('dinner')`);
  if(diet&&dietLate)h+=rowTask(taskFor('diet').time?fmtT(taskFor('diet').time):'Meals','Diet','diet');
  return h}
 function todayHTML(){const n=dayNum(),st=stats();const nm=S.profile.name?', '+esc(S.profile.name.split(' ')[0]):'';
@@ -437,7 +439,7 @@ function todayHTML(){const n=dayNum(),st=stats();const nm=S.profile.name?', '+es
  if(st.x)h+=`<div class="card warn"><h2>⚠️ ${st.x} day(s) incomplete</h2><p class="mut">75 Hard rule: miss any task on any day and you restart at Day 1. Your current attempt will be archived, not deleted.</p><button onclick="restart()">Restart challenge</button></div>`;
  if(n>75)return h+`<div class="card"><div class="big">🏁 75 Days Done</div><p class="mut">Review your journey in Calendar, Gallery and Stats.</p></div>`;
  const rot=planForDay(n);
- h+=`<div class="card" id="daySchedule"><div class="row" style="justify-content:space-between;margin:0 0 4px"><h2 style="margin:0">Day timeline</h2><span class="pill sch">Schedule</span></div><p class="mut" style="margin:0 0 8px">Morning run ~9:30 · Night lift ~6:30. Schedule checks do not miss the day.</p>${scheduleHTML()}</div>`;
+ h+=`<div class="card" id="daySchedule"><div class="row" style="justify-content:space-between;margin:0 0 4px"><h2 style="margin:0">Day timeline</h2><span class="pill sch">Schedule</span></div><p class="mut" style="margin:0 0 8px">Morning run ~9:30 · Night lift ~6:30 · Sauna ~7:00–7:20 · Dinner ~7:20–7:40. Dinner was 7:15–7:30 and moved back so the sauna fits after the workout. Schedule checks do not miss the day.</p>${scheduleHTML()}</div>`;
  h+=`<button type="button" class="card" id="tonight" onclick="openTonight()"><div class="tag" style="color:var(--org)">Tonight</div><div class="big" id="tonightLine" style="font-size:22px;text-transform:none">Tonight: ${esc(rotLabel(rot))}</div><div class="mut">Tap to log sets</div></button>`;
  const d=day(today());save();const c=d.tasks.filter(t=>t.done).length;
  h+=`<div class="card"><div class="row" style="justify-content:space-between;margin:0 0 4px"><h2 style="margin:0">Today's Orders</h2><span class="pill ${c===d.tasks.length?'c':''}">${c}/${d.tasks.length}</span></div>`;
