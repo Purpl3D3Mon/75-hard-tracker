@@ -30,7 +30,7 @@ main{padding:0 14px;max-width:560px;margin:auto}
 .tl .what{flex:1;min-width:0}
 .tl .what .tn{overflow-wrap:anywhere}
 .tl .box{flex:0 0 36px}
-.pill.sch{background:transparent;border:1px solid var(--line);color:var(--mut)}
+.pill.sch{background:transparent;border:1px solid var(--line);color:var(--mut)}.pill.sup{background:#14301f;color:var(--grn);border:1px solid #30d15855}
 button,.btn{font:600 15px Inter,sans-serif;border:0;border-radius:12px;padding:13px 18px;background:var(--red);color:#fff;min-height:48px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-transform:uppercase;letter-spacing:.5px;font-family:var(--hd);font-size:16px}
 button.sec,.btn.sec{background:var(--line);color:var(--tx)}button.ghost{background:none;border:1px solid var(--line);color:var(--tx)}button.w{width:100%}
 input,textarea,select{font:inherit;background:#0b0c0e;color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:12px;min-height:48px;width:100%}textarea{min-height:80px}
@@ -412,24 +412,36 @@ function ring(n,tot,pct){const r=64,C=2*Math.PI*r;return`<div class="ring"><svg 
 function flameHTML(st){return`<div class="flame ${st.cur?'':'off'}">${FLAME}<div><div class="big" style="font-size:24px">${st.cur} <span class="tag">day streak</span></div><div class="mut">Best: ${st.best}</div></div></div>`}
 function schedRow(when,label,sub,done,click,extra){return `<div class="tl${done?' done':''}" onclick="${click}"><div class="when">${esc(when)}</div><div class="what"><div class="tn">${esc(label)}</div><div class="mut">${sub}</div></div>${extra||''}<div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div></div>`}
 function scheduleHTML(){const d=day(today()),bag=S.sched&&S.sched[today()]||{};const doneTask=role=>{const meta=taskFor(role);if(!meta)return null;return (d.tasks||[]).find(t=>String(t.id)===String(meta.id))||null};
- const rowTask=(when,label,role,extra)=>{const t=doneTask(role);if(!t)return schedRow(when,label,'Schedule — no matching challenge task',!!bag[role],`togSched('${role}')`);const meta=taskFor(role);return schedRow(when,label,`<span class="pill">75 Hard</span> ${esc(t.name)}${meta&&meta.time?' · '+esc(fmtT(meta.time)):''}`,!!t.done,`tog('${esc(t.id)}')`,extra)};
+ const linked=new Set();
+ const rowTask=(when,label,role,extra)=>{const t=doneTask(role);if(!t)return schedRow(when,label,'Schedule — no matching challenge task',!!bag[role],`togSched('${role}')`);linked.add(String(t.id));const meta=taskFor(role);return schedRow(when,label,`<span class="pill">75 Hard</span> ${esc(t.name)}${meta&&meta.time?' · '+esc(fmtT(meta.time)):''}`,!!t.done,`tog('${esc(t.id)}')`,extra)};
  const opt=(when,id,label)=>schedRow(when,label,'<span class="pill sch">Schedule</span> Not a challenge task',!!bag[id],`togSched('${id}')`);
+ const supp=(when,id,label,note)=>schedRow(when,label,`<span class="pill sup">Supplement</span> ${note}`,!!bag[id],`togSched('${id}')`);
  let h=`<div class="tag">Morning</div>`;
  h+=opt('6:30','wake','Wake up');
  h+=rowTask('6:30–7:10','Ginger drink + water','water');
  h+=opt('7:10','brush','Brush teeth / wet face and hair');
  h+=rowTask('7:15','Progress picture','photo',doneTask('photo')?`<button type="button" class="sec" style="min-height:36px;padding:6px 10px;flex:0 0 auto" onclick="event.stopPropagation();takePhoto()">📷</button>`:'');
  h+=opt('7:20','charts','Hop on charts');
+ h+=supp('7:20–9','ultra','Ultra Focus pouch','Before trading. Pouches are on order.');
  h+=opt('7:30–9:00','trade','Trade');
  h+=rowTask('9:30','Outdoor run','run');
- h+=opt('10:15–10:30','breakfast','Breakfast + pills');
+ h+=opt('10:15–10:30','breakfast','Breakfast');
+ h+=supp('10:15','creatine','Creatine','5g with breakfast');
+ h+=supp('10:15','d3','Vitamin D3','With breakfast');
+ h+=supp('10:15','omega','Omega-3 / fish oil','With breakfast');
  const diet=doneTask('diet'),dietLate=!diet||clockOf(taskFor('diet').time)>='12:00';
  if(diet&&!dietLate)h+=rowTask(fmtT(taskFor('diet').time),'Diet','diet');
+ h+=`<div class="tag" style="margin-top:12px">Midday</div>`;
+ h+=supp('Lunch','whey','Whey protein','With yogurt');
  h+=`<div class="tag" style="margin-top:12px">Evening</div>`;
  h+=rowTask('6:30 PM','Night weights + push-ups + abs','lift',doneTask('lift')?`<button type="button" class="sec" style="min-height:36px;padding:6px 10px;flex:0 0 auto" onclick="event.stopPropagation();openTonight()">Log</button>`:'');
  h+=schedRow('7:00–7:20 PM','Sauna','<span class="pill sch">Schedule</span> Finnleo · ~175°F (80°C) · one 12–15 min sit, or 2×10–12 with a cool shower',!!bag.sauna,`togSched('sauna')`,`<button type="button" class="howbtn" onclick="event.stopPropagation();openSauna()">How to</button>`);
  h+=schedRow('7:20–7:40 PM','Dinner','<span class="pill sch">Schedule</span> Not a challenge task. After the sauna — was 7:15–7:30.',!!bag.dinner,`togSched('dinner')`);
  if(diet&&dietLate)h+=rowTask(taskFor('diet').time?fmtT(taskFor('diet').time):'Meals','Diet','diet');
+ h+=supp('Before bed','ashwa','Ashwagandha','~30 min before bed, with glycine');
+ h+=supp('Before bed','mag','Magnesium glycinate','~30 min before bed, with glycine');
+ h+=supp('Before bed','glycine','Glycine','~30 min before bed, with ashwagandha and magnesium');
+ byDayTime((d.tasks||[]).filter(t=>!linked.has(String(t.id)))).forEach(t=>{const meta=(S.tasks||[]).find(x=>String(x.id)===String(t.id));const when=meta&&normT(meta.time)?fmtT(normT(meta.time)):'';h+=schedRow(when,t.name,`<span class="pill">75 Hard</span> ${t.done?'Done':when?'Reminder '+esc(when):'Challenge task'}`,!!t.done,`tog('${esc(t.id)}')`,isPhotoTask(t)?`<button type="button" class="sec" style="min-height:36px;padding:6px 10px;flex:0 0 auto" onclick="event.stopPropagation();takePhoto()">📷</button>`:'')});
  return h}
 function todayHTML(){const n=dayNum(),st=stats();const nm=S.profile.name?', '+esc(S.profile.name.split(' ')[0]):'';
  if(n<1)return`<div class="card"><div class="tag">Starts ${fmtD(S.start)}</div><div class="big">${-n+1} day(s) out${nm}</div><p class="mut">Lock in. Prep your meals, buy a gallon jug, pick your book.</p></div>`;
@@ -438,12 +450,10 @@ function todayHTML(){const n=dayNum(),st=stats();const nm=S.profile.name?', '+es
  if(st.x)h+=`<div class="card warn"><h2>⚠️ ${st.x} day(s) incomplete</h2><p class="mut">75 Hard rule: miss any task on any day and you restart at Day 1. Your current attempt will be archived, not deleted.</p><button onclick="restart()">Restart challenge</button></div>`;
  if(n>75)return h+`<div class="card"><div class="big">🏁 75 Days Done</div><p class="mut">Review your journey in Calendar, Gallery and Stats.</p></div>`;
  const rot=planForDay(n);
- h+=`<div class="card" id="daySchedule"><div class="row" style="justify-content:space-between;margin:0 0 4px"><h2 style="margin:0">Day timeline</h2><span class="pill sch">Schedule</span></div><p class="mut" style="margin:0 0 8px">Morning run ~9:30 · Night lift ~6:30 · Sauna ~7:00–7:20 · Dinner ~7:20–7:40. Dinner was 7:15–7:30 and moved back so the sauna fits after the workout. Schedule checks do not miss the day.</p>${scheduleHTML()}</div>`;
+ h+=`<div class="card" id="daySchedule"><div class="row" style="justify-content:space-between;margin:0 0 4px"><h2 style="margin:0">Day timeline</h2><span class="pill sch">Schedule</span></div><p class="mut" style="margin:0 0 8px">Morning run ~9:30 · Night lift ~6:30 · Sauna ~7:00–7:20 · Dinner ~7:20–7:40. Dinner was 7:15–7:30 and moved back so the sauna fits after the workout. Schedule checks do not miss the day.</p><p class="mut" style="margin:0 0 8px">Supplements (America/Denver): Ultra Focus pouch 7:20–9 before trading · 10:15 with breakfast — creatine 5g, vitamin D3, omega-3 · Lunch — whey with yogurt · ~30 min before bed — ashwagandha, magnesium glycinate, glycine.</p>${scheduleHTML()}</div>`;
  h+=`<button type="button" class="card" id="tonight" onclick="openTonight()"><div class="tag" style="color:var(--org)">Tonight</div><div class="big" id="tonightLine" style="font-size:22px;text-transform:none">Tonight: ${esc(rotLabel(rot))}</div><div class="mut">Tap to log sets</div></button>`;
- const d=day(today());save();const c=d.tasks.filter(t=>t.done).length;
- h+=`<div class="card"><div class="row" style="justify-content:space-between;margin:0 0 4px"><h2 style="margin:0">Today's Orders</h2><span class="pill ${c===d.tasks.length?'c':''}">${c}/${d.tasks.length}</span></div>`;
- byDayTime(d.tasks).forEach(t=>{const tt=S.tasks.find(x=>x.id===t.id);h+=`<div class="task ${t.done?'done':''}" data-id="${esc(t.id)}" onclick="tog(this.dataset.id)"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div style="flex:1"><div class="tn">${esc(t.name)}</div><div class="mut">${t.done?'Done':tt?'Reminder '+fmtT(tt.time):''}</div></div>${isPhotoTask(t)?`<button class="sec" style="min-height:40px;padding:8px 12px" onclick="event.stopPropagation();takePhoto()">📷</button>`:''}</div>`});
- return h+`</div><div class="card" id="todayPhoto" style="display:none"></div><p class="mut" style="text-align:center">Unchecked tasks at midnight = day marked incomplete.</p>`}
+ day(today());save();
+ return h+`<div class="card" id="todayPhoto" style="display:none"></div><p class="mut" style="text-align:center">Unchecked tasks at midnight = day marked incomplete.</p>`}
 async function hydrateToday(){const u=await photoURL(today()).catch(()=>null),el=$('todayPhoto');if(u&&el){el.style.display='block';el.innerHTML=`<div class="row" style="justify-content:space-between;margin:0 0 8px"><h2 style="margin:0">Today's Photo</h2><button class="sec" style="min-height:38px;padding:6px 12px" onclick="takePhoto()">Retake</button></div><img src="${u}" style="width:100%;border-radius:12px">`}}
 function tog(id){const d=day(today()),t=d.tasks.find(x=>String(x.id)===String(id));if(!t)return;t.done=t.done?null:Date.now();if(navigator.vibrate&&t.done)navigator.vibrate(15);save();render()}
 function calHTML(){const t=today();let h=`<div class="card"><h2>75-Day Map</h2><div class="mut" style="margin-bottom:12px">🟩 Complete · 🟥 Incomplete · 🟧 Today · 📷 photo</div><div class="grid">`;
