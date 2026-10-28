@@ -24,6 +24,13 @@ main{padding:0 14px;max-width:560px;margin:auto}
 .box{flex:0 0 36px;height:36px;border-radius:10px;border:2px solid #4a5059;display:grid;place-items:center;transition:all .25s}.box svg{width:22px;height:22px;stroke:#000;stroke-width:3.5;fill:none;stroke-dasharray:30;stroke-dashoffset:30}
 .done .box{background:var(--grn);border-color:var(--grn);box-shadow:0 0 14px #30d15866;animation:pop .35s}.done .box svg{stroke-dashoffset:0;transition:stroke-dashoffset .35s .05s}@keyframes pop{50%{transform:scale(1.18)}}
 .tn{font-weight:600}.done .tn{color:var(--mut);text-decoration:line-through}
+.tl{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);cursor:pointer;min-width:0}
+.tl:last-child{border-bottom:0}
+.tl .when{flex:0 0 108px;font:700 13px var(--hd);letter-spacing:.3px;color:var(--org);white-space:nowrap}
+.tl .what{flex:1;min-width:0}
+.tl .what .tn{overflow-wrap:anywhere}
+.tl .box{flex:0 0 36px}
+.pill.sch{background:transparent;border:1px solid var(--line);color:var(--mut)}
 button,.btn{font:600 15px Inter,sans-serif;border:0;border-radius:12px;padding:13px 18px;background:var(--red);color:#fff;min-height:48px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-transform:uppercase;letter-spacing:.5px;font-family:var(--hd);font-size:16px}
 button.sec,.btn.sec{background:var(--line);color:var(--tx)}button.ghost{background:none;border:1px solid var(--line);color:var(--tx)}button.w{width:100%}
 input,textarea,select{font:inherit;background:#0b0c0e;color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:12px;min-height:48px;width:100%}textarea{min-height:80px}
@@ -122,7 +129,7 @@ a.howyt{color:var(--org);font:700 13px var(--hd);letter-spacing:.6px;text-transf
 let lastTouch=0;document.addEventListener('touchend',e=>{const n=Date.now();if(n-lastTouch<300&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))e.preventDefault();lastTouch=n},{passive:false});
 document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
 let profMode='view',chalMode='view',woMode='view',woPick=null;
-const K='75hard-v1',SCHEMA=6,DEF=[["Morning run – OUTDOORS (45 min)","09:30"],["Night workout (45 min)","18:30"],["Follow diet – no cheat meals or alcohol","20:00"],["Drink 1 gallon of water","19:00"],["Read 10 pages of nonfiction","21:00"],["Take a progress photo","07:00"]];
+const K='75hard-v1',SCHEMA=7,DEF=[["Morning run – OUTDOORS (45 min)","09:30"],["Night workout (45 min)","18:30"],["Follow diet – no cheat meals or alcohol","20:00"],["Drink 1 gallon of water","19:00"],["Read 10 pages of nonfiction","21:00"],["Take a progress photo","07:15"]];
 let view='today';
 /* ---------- state + migration (lossless) ---------- */
 function migrate(s){if(!s||typeof s!=='object')return null;const v=s.v||1;
@@ -132,6 +139,7 @@ function migrate(s){if(!s||typeof s!=='object')return null;const v=s.v||1;
  if((s.v||1)<4){if(!s.lifts||typeof s.lifts!=='object'||Array.isArray(s.lifts))s.lifts={};if(!Array.isArray(s.plan)||!s.plan.length)s.plan=defPlan();s.v=4}
  if((s.v||1)<5)s.v=5;
  if((s.v||1)<6){if(!Array.isArray(s.plan)||!s.plan.length||planIsStock(s.plan))s.plan=mergePlanExtras(s.plan,defPlan());else ensureFinishers(s.plan);retimes(s.tasks);s.v=6}
+ if((s.v||1)<7){if(!s.sched||typeof s.sched!=='object'||Array.isArray(s.sched))s.sched={};retimes16(s.tasks);s.v=7}
  return s}
 let S=migrate(JSON.parse(localStorage.getItem(K)||'null'));if(S)localStorage.setItem(K,JSON.stringify(S));
 const save=()=>localStorage.setItem(K,JSON.stringify(S));
@@ -249,7 +257,14 @@ function defPlan(){const days=[
 function planShape(plan){if(!Array.isArray(plan))return '';return JSON.stringify(plan.map(d=>[d&&d.id,d&&d.name,!!(d&&d.circuit),(d&&d.exercises||[]).map(e=>[e&&e.id,e&&e.name,+(e&&e.sets),String(e&&e.reps==null?'':e.reps),!!(e&&e.cardio)])]))}
 function planIsStock(plan){const STOCK='[["A","Push",false,[["A0","Chest press (press arm)",4,"8-10",false],["A1","Incline press (seat reclined)",3,"10",false],["A2","Cable fly (pulley handles)",3,"12",false],["A3","Single-arm overhead press (low pulley)",3,"10 each",false],["A4","Triceps pushdown (high pulley)",3,"12",false]]],["B","Pull",false,[["B0","Lat pulldown (high pulley)",4,"8-10",false],["B1","Seated row (low pulley, chain bar)",4,"10",false],["B2","Face pull (high pulley)",3,"15",false],["B3","Cable curl (low pulley)",3,"12",false],["B4","Single-arm row",3,"10 each",false]]],["C","Legs",false,[["C0","Leg extension",4,"12",false],["C1","Leg curl",4,"12",false],["C2","Cable squat (low pulley bar)",4,"10",false],["C3","Cable Romanian deadlift",3,"10",false],["C4","Standing calf raise (low pulley)",3,"15",false]]],["D","Full body + conditioning",true,[["D0","Lat pulldown",4,"10",false],["D1","Chest press",4,"10",false],["D2","Seated row",4,"10",false],["D3","Cable squat",4,"10",false],["D4","Elliptical intervals",1,"10 min",true]]]]';return planShape(plan)===STOCK}
 function ensureFinishers(plan){if(!Array.isArray(plan))return plan;plan.forEach(d=>{if(!d||!Array.isArray(d.exercises))return;const names=d.exercises.map(e=>String(e&&e.name||'').toLowerCase());const ids=new Set(d.exercises.map(e=>e&&e.id));const nid=s=>{let id=(d.id||'X')+s,n=0;while(ids.has(id)){n++;id=(d.id||'X')+s+n}ids.add(id);return id};if(!names.some(n=>/push-?ups?/.test(n)))d.exercises.push({id:nid('p'),name:'Push-ups',sets:1,reps:'30',count:true,cardio:false});if(!names.some(n=>/\babs\b/.test(n)))d.exercises.push({id:nid('a'),name:'Abs',sets:1,reps:'10 min',abs:true,cardio:false})});return plan}
-function retimes(tasks){if(!Array.isArray(tasks))return;tasks.forEach(t=>{if(!t)return;const m=String(t.time==null?'':t.time).match(/^(\d{1,2}):(\d{2})/);const time=m?m[1].padStart(2,'0')+':'+m[2]:'';const name=String(t.name||'');if(name==='Workout 2 – OUTDOORS (45 min)'&&time==='17:00')t.time='09:30';if(name==='Workout 1 (45 min)'&&time==='06:00')t.time='18:30'})}
+function clockOf(t){const m=String(t==null?'':t).match(/^(\d{1,2}):(\d{2})/);return m?m[1].padStart(2,'0')+':'+m[2]:''}
+function retimes(tasks){if(!Array.isArray(tasks))return;tasks.forEach(t=>{if(!t)return;const time=clockOf(t.time),name=String(t.name||'');if(name==='Workout 2 – OUTDOORS (45 min)'&&time==='17:00')t.time='09:30';if(name==='Workout 1 (45 min)'&&time==='06:00')t.time='18:30'})}
+function retimes16(tasks){if(!Array.isArray(tasks))return;tasks.forEach(t=>{if(!t)return;const time=clockOf(t.time),name=String(t.name||'');if(name==='Take a progress photo'&&time==='07:00')t.time='07:15';if((name==='Workout 2 – OUTDOORS (45 min)'||name==='Morning run – OUTDOORS (45 min)')&&time==='17:00')t.time='09:30';if((name==='Workout 1 (45 min)'||name==='Night workout (45 min)')&&time==='06:00')t.time='18:30'})}
+function taskRole(name){const n=String(name||'').toLowerCase();if(/photo/.test(n))return 'photo';if(/water|gallon/.test(n))return 'water';if(/outdoor|\brun\b/.test(n))return 'run';if(/diet|cheat/.test(n))return 'diet';if(/workout|lift/.test(n))return 'lift';return ''}
+function taskFor(role){return (S.tasks||[]).find(t=>taskRole(t.name)===role)||null}
+function schedBag(){if(!S.sched||typeof S.sched!=='object'||Array.isArray(S.sched))S.sched={};const k=today();if(!S.sched[k]||typeof S.sched[k]!=='object'||Array.isArray(S.sched[k]))S.sched[k]={};return S.sched[k]}
+function togSched(id){const b=schedBag();b[id]=b[id]?null:Date.now();if(navigator.vibrate&&b[id])navigator.vibrate(12);save();render()}
+function schedDone(id){const b=S.sched&&S.sched[today()];return !!(b&&b[id])}
 function mergePlanExtras(prev,next){const byId=new Map(),byName=new Map();(prev||[]).forEach(d=>(d.exercises||[]).forEach(e=>{if(!e)return;const extra={};Object.keys(e).forEach(k=>{if(k!=='id'&&k!=='name'&&k!=='sets'&&k!=='reps'&&k!=='cardio'&&k!=='lb')extra[k]=e[k]});if(!Object.keys(extra).length)return;if(e.id)byId.set(e.id,extra);const nm=String(e.name||'').trim().toLowerCase();if(nm&&!byName.has(nm))byName.set(nm,extra)}));next.forEach(d=>(d.exercises||[]).forEach(e=>{const extra=byId.get(e.id)||byName.get(String(e.name||'').trim().toLowerCase());if(extra)Object.assign(e,extra)}));return next}
 function plan(){if(!S.plan||!S.plan.length)S.plan=defPlan();return S.plan}
 function planForDay(n){const p=plan();return p[((n-1)%p.length+p.length)%p.length]}
@@ -395,6 +410,26 @@ function render(){const nav=$('nav');nav.style.display=S?'flex':'none';nav.inner
  if(view==='gal')hydrateGal();if(view==='set')hydrateAvatar();if(view==='today')hydrateToday();if(view==='lift')paintTimer()}
 function ring(n,tot,pct){const r=64,C=2*Math.PI*r;return`<div class="ring"><svg width="150" height="150"><defs><linearGradient id="rg"><stop offset="0" stop-color="#ff3b30"/><stop offset="1" stop-color="#ff8a00"/></linearGradient></defs><circle cx="75" cy="75" r="${r}" stroke="#23262b" stroke-width="12" fill="none"/><circle class="p" cx="75" cy="75" r="${r}" stroke="url(#rg)" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct/100)}"/></svg><div class="in"><div><div class="o">DAY</div><div class="n">${n}</div><div class="o">/ ${tot}</div></div></div></div>`}
 function flameHTML(st){return`<div class="flame ${st.cur?'':'off'}">${FLAME}<div><div class="big" style="font-size:24px">${st.cur} <span class="tag">day streak</span></div><div class="mut">Best: ${st.best}</div></div></div>`}
+function schedRow(when,label,sub,done,click,extra){return `<div class="tl${done?' done':''}" onclick="${click}"><div class="when">${esc(when)}</div><div class="what"><div class="tn">${esc(label)}</div><div class="mut">${sub}</div></div>${extra||''}<div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div></div>`}
+function scheduleHTML(){const d=day(today()),bag=S.sched&&S.sched[today()]||{};const doneTask=role=>{const meta=taskFor(role);if(!meta)return null;return (d.tasks||[]).find(t=>String(t.id)===String(meta.id))||null};
+ const rowTask=(when,label,role,extra)=>{const t=doneTask(role);if(!t)return schedRow(when,label,'Schedule — no matching challenge task',!!bag[role],`togSched('${role}')`);const meta=taskFor(role);return schedRow(when,label,`<span class="pill">75 Hard</span> ${esc(t.name)}${meta&&meta.time?' · '+esc(fmtT(meta.time)):''}`,!!t.done,`tog('${esc(t.id)}')`,extra)};
+ const opt=(when,id,label)=>schedRow(when,label,'<span class="pill sch">Schedule</span> Not a challenge task',!!bag[id],`togSched('${id}')`);
+ let h=`<div class="tag">Morning</div>`;
+ h+=opt('6:30','wake','Wake up');
+ h+=rowTask('6:30–7:10','Ginger drink + water','water');
+ h+=opt('7:10','brush','Brush teeth / wet face and hair');
+ h+=rowTask('7:15','Progress picture','photo',doneTask('photo')?`<button type="button" class="sec" style="min-height:36px;padding:6px 10px;flex:0 0 auto" onclick="event.stopPropagation();takePhoto()">📷</button>`:'');
+ h+=opt('7:20','charts','Hop on charts');
+ h+=opt('7:30–9:00','trade','Trade');
+ h+=rowTask('9:30','Outdoor run','run');
+ h+=opt('10:15–10:30','breakfast','Breakfast + pills');
+ const diet=doneTask('diet'),dietLate=!diet||clockOf(taskFor('diet').time)>='12:00';
+ if(diet&&!dietLate)h+=rowTask(fmtT(taskFor('diet').time),'Diet','diet');
+ h+=`<div class="tag" style="margin-top:12px">Evening</div>`;
+ h+=rowTask('6:30 PM','Night weights + push-ups + abs','lift',doneTask('lift')?`<button type="button" class="sec" style="min-height:36px;padding:6px 10px;flex:0 0 auto" onclick="event.stopPropagation();openTonight()">Log</button>`:'');
+ h+=opt('7:15–7:30 PM','dinner','Dinner');
+ if(diet&&dietLate)h+=rowTask(taskFor('diet').time?fmtT(taskFor('diet').time):'Meals','Diet','diet');
+ return h}
 function todayHTML(){const n=dayNum(),st=stats();const nm=S.profile.name?', '+esc(S.profile.name.split(' ')[0]):'';
  if(n<1)return`<div class="card"><div class="tag">Starts ${fmtD(S.start)}</div><div class="big">${-n+1} day(s) out${nm}</div><p class="mut">Lock in. Prep your meals, buy a gallon jug, pick your book.</p></div>`;
  const dn=Math.min(n,75),tp=Math.round(dn/75*100);
@@ -402,7 +437,7 @@ function todayHTML(){const n=dayNum(),st=stats();const nm=S.profile.name?', '+es
  if(st.x)h+=`<div class="card warn"><h2>⚠️ ${st.x} day(s) incomplete</h2><p class="mut">75 Hard rule: miss any task on any day and you restart at Day 1. Your current attempt will be archived, not deleted.</p><button onclick="restart()">Restart challenge</button></div>`;
  if(n>75)return h+`<div class="card"><div class="big">🏁 75 Days Done</div><p class="mut">Review your journey in Calendar, Gallery and Stats.</p></div>`;
  const rot=planForDay(n);
- h+=`<p class="mut" id="daySchedule" style="text-align:center;margin:12px 4px 0">Morning run ~9:30 · Night lift ~6:30</p>`;
+ h+=`<div class="card" id="daySchedule"><div class="row" style="justify-content:space-between;margin:0 0 4px"><h2 style="margin:0">Day timeline</h2><span class="pill sch">Schedule</span></div><p class="mut" style="margin:0 0 8px">Morning run ~9:30 · Night lift ~6:30. Schedule checks do not miss the day.</p>${scheduleHTML()}</div>`;
  h+=`<button type="button" class="card" id="tonight" onclick="openTonight()"><div class="tag" style="color:var(--org)">Tonight</div><div class="big" id="tonightLine" style="font-size:22px;text-transform:none">Tonight: ${esc(rotLabel(rot))}</div><div class="mut">Tap to log sets</div></button>`;
  const d=day(today());save();const c=d.tasks.filter(t=>t.done).length;
  h+=`<div class="card"><div class="row" style="justify-content:space-between;margin:0 0 4px"><h2 style="margin:0">Today's Orders</h2><span class="pill ${c===d.tasks.length?'c':''}">${c}/${d.tasks.length}</span></div>`;

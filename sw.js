@@ -1,4 +1,4 @@
-const C='75h-v15',F=['./','./index.html','./manifest.json','./icon.svg','./apple-touch-icon.png'];
+const C='75h-v16',F=['./','./index.html','./manifest.json','./icon.svg','./apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(F)));self.skipWaiting()});
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',e=>{try{const h=new URL(e.request.url).hostname;if(/(^|\.)youtube\.com$|(^|\.)youtube-nocookie\.com$|(^|\.)youtu\.be$|(^|\.)googlevideo\.com$|(^|\.)ytimg\.com$/.test(h))return}catch(err){}e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))});
