@@ -458,17 +458,18 @@ function scheduleHTML(){const d=day(today()),tasks=(d.tasks||[]).slice(),used=ne
 function supplementsHTML(){const bag=S.sched&&S.sched[today()]||{};
  const row=(when,id,label)=>schedRow(when,label,'',!!bag[id],`togSched('${id}')`);
  let h=`<div class="tag">Before trading</div>`;
- h+=row('7:20–9','ultra','Ultra Focus');
+ h+=row('7:20','ultra','Ultra Focus · 1 pouch');
  h+=`<div class="tag" style="margin-top:20px">Breakfast</div>`;
- h+=row('10:15','creatine','Creatine 5g');
- h+=row('10:15','d3','Vitamin D3');
- h+=row('10:15','omega','Omega-3');
+ h+=row('10:15','creatine','Creatine · 1 scoop');
+ h+=row('10:15','d3','Vitamin D3 · 1');
+ h+=row('10:15','omega','Omega · 1');
+ h+=row('10:15','ashwa_am','Ashwagandha · 2');
  h+=`<div class="tag" style="margin-top:20px">Lunch</div>`;
- h+=row('','whey','Whey');
+ h+=row('','whey','Protein · 1 scoop');
  h+=`<div class="tag" style="margin-top:20px">Before bed</div>`;
- h+=row('30 min','ashwa','Ashwagandha');
- h+=row('30 min','mag','Magnesium');
- h+=row('30 min','glycine','Glycine');
+ h+=row('30 min','ashwa','Ashwagandha · 2');
+ h+=row('30 min','mag','Magnesium · 2');
+ h+=row('30 min','glycine','Glycine · 3 scoops');
  return h}
 function stackHTML(){return `<div class="card" id="stackList"><h2 style="margin:0 0 4px">Stack</h2>${supplementsHTML()}</div>`}
 function todayHTML(){const n=dayNum(),st=stats();const nm=S.profile.name?', '+esc(S.profile.name.split(' ')[0]):'';
