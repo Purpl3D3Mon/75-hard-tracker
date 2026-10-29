@@ -24,9 +24,9 @@ main{padding:0 14px;max-width:560px;margin:auto}
 .box{flex:0 0 36px;height:36px;border-radius:10px;border:2px solid #4a5059;display:grid;place-items:center;transition:all .25s}.box svg{width:22px;height:22px;stroke:#000;stroke-width:3.5;fill:none;stroke-dasharray:30;stroke-dashoffset:30}
 .done .box{background:var(--grn);border-color:var(--grn);box-shadow:0 0 14px #30d15866;animation:pop .35s}.done .box svg{stroke-dashoffset:0;transition:stroke-dashoffset .35s .05s}@keyframes pop{50%{transform:scale(1.18)}}
 .tn{font-weight:600}.done .tn{color:var(--mut);text-decoration:line-through}
-.tl{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);cursor:pointer;min-width:0}
+.tl{display:flex;align-items:center;gap:12px;padding:18px 0;border-bottom:1px solid var(--line);cursor:pointer;min-width:0}
 .tl:last-child{border-bottom:0}
-.tl .when{flex:0 0 108px;font:700 13px var(--hd);letter-spacing:.3px;color:var(--org);white-space:nowrap}
+.tl .when{flex:0 0 92px;font:700 13px var(--hd);letter-spacing:.3px;color:var(--org);white-space:nowrap}
 .tl .what{flex:1;min-width:0}
 .tl .what .tn{overflow-wrap:anywhere}
 .tl .box{flex:0 0 36px}
@@ -416,44 +416,61 @@ function render(){const nav=$('nav');nav.style.display=S?'flex':'none';nav.inner
  if(view==='gal')hydrateGal();if(view==='set')hydrateAvatar();if(view==='today')hydrateToday();if(view==='lift')paintTimer()}
 function ring(n,tot,pct){const r=64,C=2*Math.PI*r;return`<div class="ring"><svg width="150" height="150"><defs><linearGradient id="rg"><stop offset="0" stop-color="#ff3b30"/><stop offset="1" stop-color="#ff8a00"/></linearGradient></defs><circle cx="75" cy="75" r="${r}" stroke="#23262b" stroke-width="12" fill="none"/><circle class="p" cx="75" cy="75" r="${r}" stroke="url(#rg)" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct/100)}"/></svg><div class="in"><div><div class="o">DAY</div><div class="n">${n}</div><div class="o">/ ${tot}</div></div></div></div>`}
 function flameHTML(st){return`<div class="flame ${st.cur?'':'off'}">${FLAME}<div><div class="big" style="font-size:24px">${st.cur} <span class="tag">day streak</span></div><div class="mut">Best: ${st.best}</div></div></div>`}
-function schedRow(when,label,sub,done,click,extra){return `<div class="tl${done?' done':''}" onclick="${click}"><div class="when">${esc(when)}</div><div class="what"><div class="tn">${esc(label)}</div><div class="mut">${sub}</div></div>${extra||''}<div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div></div>`}
-function scheduleHTML(){const d=day(today()),bag=S.sched&&S.sched[today()]||{};const doneTask=role=>{const meta=taskFor(role);if(!meta)return null;return (d.tasks||[]).find(t=>String(t.id)===String(meta.id))||null};
- const linked=new Set();
- const rowTask=(when,label,role,extra)=>{const t=doneTask(role);if(!t)return schedRow(when,label,'Schedule — no matching challenge task',!!bag[role],`togSched('${role}')`);linked.add(String(t.id));const meta=taskFor(role);return schedRow(when,label,`<span class="pill">75 Hard</span> ${esc(t.name)}${meta&&meta.time?' · '+esc(fmtT(meta.time)):''}`,!!t.done,`tog('${esc(t.id)}')`,extra)};
- const opt=(when,id,label)=>schedRow(when,label,'<span class="pill sch">Schedule</span> Not a challenge task',!!bag[id],`togSched('${id}')`);
- let h=`<div class="tag">Morning</div>`;
- h+=opt('6:30','wake','Wake up');
- h+=rowTask('6:30–7:10','Ginger drink + water','water');
- h+=opt('7:10','brush','Brush teeth / wet face and hair');
- h+=rowTask('7:15','Progress picture','photo',doneTask('photo')?`<button type="button" class="sec" style="min-height:36px;padding:6px 10px;flex:0 0 auto" onclick="event.stopPropagation();takePhoto()">📷</button>`:'');
- h+=opt('7:20','charts','Hop on charts');
- h+=opt('7:30–9:00','trade','Trade');
- h+=rowTask('9:30','Outdoor run','run');
- h+=opt('10:15–10:30','breakfast','Breakfast');
- const diet=doneTask('diet'),dietLate=!diet||clockOf(taskFor('diet').time)>='12:00';
- if(diet&&!dietLate)h+=rowTask(fmtT(taskFor('diet').time),'Diet','diet');
- h+=`<div class="tag" style="margin-top:12px">Evening</div>`;
- h+=rowTask('6:30 PM','Night weights + push-ups + abs','lift',doneTask('lift')?`<button type="button" class="sec" style="min-height:36px;padding:6px 10px;flex:0 0 auto" onclick="event.stopPropagation();openTonight()">Log</button>`:'');
- h+=schedRow('7:00–7:20 PM','Sauna','<span class="pill sch">Schedule</span> Finnleo · ~175°F (80°C) · one 12–15 min sit, or 2×10–12 with a cool shower',!!bag.sauna,`togSched('sauna')`,`<button type="button" class="howbtn" onclick="event.stopPropagation();openSauna()">How to</button>`);
- h+=schedRow('7:20–7:40 PM','Dinner','<span class="pill sch">Schedule</span> Not a challenge task. After the sauna — was 7:15–7:30.',!!bag.dinner,`togSched('dinner')`);
- if(diet&&dietLate)h+=rowTask(taskFor('diet').time?fmtT(taskFor('diet').time):'Meals','Diet','diet');
- byDayTime((d.tasks||[]).filter(t=>!linked.has(String(t.id)))).forEach(t=>{const meta=(S.tasks||[]).find(x=>String(x.id)===String(t.id));const when=meta&&normT(meta.time)?fmtT(normT(meta.time)):'';h+=schedRow(when,t.name,`<span class="pill">75 Hard</span> ${t.done?'Done':when?'Reminder '+esc(when):'Challenge task'}`,!!t.done,`tog('${esc(t.id)}')`,isPhotoTask(t)?`<button type="button" class="sec" style="min-height:36px;padding:6px 10px;flex:0 0 auto" onclick="event.stopPropagation();takePhoto()">📷</button>`:'')});
+function schedRow(when,label,sub,done,click,extra){const note=sub?`<div class="mut">${sub}</div>`:'';const w=when?`<div class="when">${esc(when)}</div>`:'';return `<div class="tl${done?' done':''}" onclick="${click}">${w}<div class="what"><div class="tn">${esc(label)}</div>${note}</div>${extra||''}<div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div></div>`}
+function rowMins(when){const s=String(when||'');const m=s.match(/(\d{1,2})(?::(\d{2}))?/);if(!m)return 24*60+59;let h=+m[1],min=+(m[2]||0);if(/pm/i.test(s)&&h<12)h+=12;if(/am/i.test(s)&&h===12)h=0;return h*60+min}
+function shortTask(name){const n=String(name||'');if(/read|pages|nonfiction/i.test(n))return 'Read';if(/water|gallon/i.test(n))return 'Water';if(/photo/i.test(n))return 'Photo';if(/diet|cheat/i.test(n))return 'Diet';if(/outdoor|\brun\b/i.test(n))return 'Run';if(/workout|lift/i.test(n))return 'Night workout';return n}
+function scheduleHTML(){const d=day(today()),tasks=(d.tasks||[]).slice(),used=new Set();
+ const claim=pred=>{const hit=tasks.filter(t=>!used.has(String(t.id))&&pred(t));hit.forEach(t=>used.add(String(t.id)));return hit};
+ const byRole=role=>claim(t=>taskRole(t.name)===role);
+ const byName=re=>claim(t=>re.test(String(t.name||'')));
+ const items=[];
+ const add=(when,label,group,schedId,extra)=>{
+  const on=group.length?group.every(t=>t.done):schedDone(schedId);
+  const click=group.length?`togGroup('${group.map(t=>esc(t.id)).join(',')}')`:`togSched('${schedId}')`;
+  items.push({mins:rowMins(when),i:items.length,html:schedRow(when,label,'',on,click,extra||'')});
+ };
+ const cam=`<button type="button" class="sec" style="min-height:36px;padding:6px 10px;flex:0 0 auto" onclick="event.stopPropagation();takePhoto()">📷</button>`;
+ const log=`<button type="button" class="sec" style="min-height:36px;padding:6px 10px;flex:0 0 auto" onclick="event.stopPropagation();openTonight()">Log</button>`;
+ const how=`<button type="button" class="howbtn" onclick="event.stopPropagation();openSauna()">How to</button>`;
+ const photo=byRole('photo'),lift=byRole('lift'),diet=byRole('diet');
+ add('6:30','Wake up',byName(/wake/i),'wake');
+ add('6:30','Water',byRole('water'),'water');
+ add('7:10','Brush teeth',byName(/brush|teeth|wet face/i),'brush');
+ add('7:15','Photo',photo,'photo',photo.length?cam:'');
+ add('7:20','Charts',byName(/chart/i),'charts');
+ add('7:30','Trade',byName(/\btrad/i),'trade');
+ add('9:30','Run',byRole('run'),'run');
+ add('10:15','Breakfast',byName(/breakfast/i),'breakfast');
+ if(diet.length){const meta=(S.tasks||[]).find(t=>String(t.id)===String(diet[0].id));const when=meta&&normT(meta.time)?fmtT(normT(meta.time)):'8:00 PM';add(when,'Diet',diet,'diet')}
+ add('6:30 PM','Night workout',lift,'lift',lift.length?log:'');
+ add('7:00 PM','Sauna',byName(/sauna/i),'sauna',how);
+ add('7:20 PM','Dinner',byName(/dinner/i),'dinner');
+ byDayTime(tasks.filter(t=>!used.has(String(t.id)))).forEach(t=>{
+  const label=shortTask(t.name);
+  const meta=(S.tasks||[]).find(x=>String(x.id)===String(t.id));
+  const when=meta&&normT(meta.time)?fmtT(normT(meta.time)):'';
+  items.push({mins:when?rowMins(when):24*60+30,i:items.length,html:schedRow(when,label,'',!!t.done,`tog('${esc(t.id)}')`,isPhotoTask(t)?cam:'')});
+ });
+ items.sort((a,b)=>a.mins-b.mins||a.i-b.i);
+ let h=`<div class="tag">Morning</div>`,eve=false;
+ items.forEach(it=>{if(!eve&&it.mins>=17*60){h+=`<div class="tag" style="margin-top:20px">Evening</div>`;eve=true}h+=it.html});
  return h}
 function supplementsHTML(){const bag=S.sched&&S.sched[today()]||{};
- const supp=(when,id,label,note)=>schedRow(when,label,`<span class="pill sup">Supplement</span> ${note}`,!!bag[id],`togSched('${id}')`);
- let h=`<div class="tag">Morning</div>`;
- h+=supp('7:20–9','ultra','Ultra Focus pouch','Before trading. Pouches are on order.');
- h+=supp('10:15','creatine','Creatine','5g with breakfast');
- h+=supp('10:15','d3','Vitamin D3','With breakfast');
- h+=supp('10:15','omega','Omega-3 / fish oil','With breakfast');
- h+=`<div class="tag" style="margin-top:12px">Midday</div>`;
- h+=supp('Lunch','whey','Whey protein','With yogurt');
- h+=`<div class="tag" style="margin-top:12px">Evening</div>`;
- h+=supp('Before bed','ashwa','Ashwagandha','~30 min before bed');
- h+=supp('Before bed','mag','Magnesium glycinate','~30 min before bed');
- h+=supp('Before bed','glycine','Glycine','~30 min before bed');
+ const row=(when,id,label)=>schedRow(when,label,'',!!bag[id],`togSched('${id}')`);
+ let h=`<div class="tag">Before trading</div>`;
+ h+=row('7:20–9','ultra','Ultra Focus');
+ h+=`<div class="tag" style="margin-top:20px">Breakfast</div>`;
+ h+=row('10:15','creatine','Creatine 5g');
+ h+=row('10:15','d3','Vitamin D3');
+ h+=row('10:15','omega','Omega-3');
+ h+=`<div class="tag" style="margin-top:20px">Lunch</div>`;
+ h+=row('','whey','Whey');
+ h+=`<div class="tag" style="margin-top:20px">Before bed</div>`;
+ h+=row('30 min','ashwa','Ashwagandha');
+ h+=row('30 min','mag','Magnesium');
+ h+=row('30 min','glycine','Glycine');
  return h}
-function stackHTML(){return `<div class="card" id="stackList"><div class="row" style="justify-content:space-between;margin:0 0 4px"><h2 style="margin:0">Supplement stack</h2><span class="pill sup">Stack</span></div><p class="mut" style="margin:0 0 8px">America/Denver. Check each one when you take it. These do not miss the day.</p>${supplementsHTML()}</div>`}
+function stackHTML(){return `<div class="card" id="stackList"><h2 style="margin:0 0 4px">Stack</h2>${supplementsHTML()}</div>`}
 function todayHTML(){const n=dayNum(),st=stats();const nm=S.profile.name?', '+esc(S.profile.name.split(' ')[0]):'';
  if(n<1)return`<div class="card"><div class="tag">Starts ${fmtD(S.start)}</div><div class="big">${-n+1} day(s) out${nm}</div><p class="mut">Lock in. Prep your meals, buy a gallon jug, pick your book.</p></div>`;
  const dn=Math.min(n,75),tp=Math.round(dn/75*100);
@@ -461,12 +478,13 @@ function todayHTML(){const n=dayNum(),st=stats();const nm=S.profile.name?', '+es
  if(st.x)h+=`<div class="card warn"><h2>⚠️ ${st.x} day(s) incomplete</h2><p class="mut">75 Hard rule: miss any task on any day and you restart at Day 1. Your current attempt will be archived, not deleted.</p><button onclick="restart()">Restart challenge</button></div>`;
  if(n>75)return h+`<div class="card"><div class="big">🏁 75 Days Done</div><p class="mut">Review your journey in Calendar, Gallery and Stats.</p></div>`;
  const rot=planForDay(n);
- h+=`<div class="card" id="daySchedule"><div class="row" style="justify-content:space-between;margin:0 0 4px"><h2 style="margin:0">Day timeline</h2><span class="pill sch">Schedule</span></div><p class="mut" style="margin:0 0 8px">Morning run ~9:30 · Night lift ~6:30 · Sauna ~7:00–7:20 · Dinner ~7:20–7:40. Dinner was 7:15–7:30 and moved back so the sauna fits after the workout. Schedule checks do not miss the day.</p>${scheduleHTML()}</div>`;
+ h+=`<div class="card" id="daySchedule"><h2 style="margin:0 0 2px">Day timeline</h2>${scheduleHTML()}</div>`;
  h+=`<button type="button" class="card" id="tonight" onclick="openTonight()"><div class="tag" style="color:var(--org)">Tonight</div><div class="big" id="tonightLine" style="font-size:22px;text-transform:none">Tonight: ${esc(rotLabel(rot))}</div><div class="mut">Tap to open tonight's workout</div></button>`;
  day(today());save();
  return h+`<div class="card" id="todayPhoto" style="display:none"></div><p class="mut" style="text-align:center">Unchecked tasks at midnight = day marked incomplete.</p>`}
 async function hydrateToday(){const u=await photoURL(today()).catch(()=>null),el=$('todayPhoto');if(u&&el){el.style.display='block';el.innerHTML=`<div class="row" style="justify-content:space-between;margin:0 0 8px"><h2 style="margin:0">Today's Photo</h2><button class="sec" style="min-height:38px;padding:6px 12px" onclick="takePhoto()">Retake</button></div><img src="${u}" style="width:100%;border-radius:12px">`}}
 function tog(id){const d=day(today()),t=d.tasks.find(x=>String(x.id)===String(id));if(!t)return;t.done=t.done?null:Date.now();if(navigator.vibrate&&t.done)navigator.vibrate(15);save();render()}
+function togGroup(ids){const d=day(today()),list=String(ids||'').split(',').map(id=>d.tasks.find(x=>String(x.id)===id)).filter(Boolean);if(!list.length)return;const next=list.every(t=>t.done)?null:Date.now();list.forEach(t=>{t.done=next});if(navigator.vibrate&&next)navigator.vibrate(15);save();render()}
 function calHTML(){const t=today();let h=`<div class="card"><h2>75-Day Map</h2><div class="mut" style="margin-bottom:12px">🟩 Complete · 🟥 Incomplete · 🟧 Today · 📷 photo</div><div class="grid">`;
  for(let i=0;i<75;i++){const s=addD(S.start,i),d=S.days[s];const c=s===t?'t':s>t?'f':d&&d.status==='complete'?'c':'x';h+=`<div class="d ${c}" onclick="${c==='f'?'':`show('${s}')`}">${i+1}${photoSet.has(s)?'<i>📷</i>':''}</div>`}
  return h+`</div><p class="mut">${fmtD(S.start)} → ${fmtD(addD(S.start,74))}. Tap a day for its breakdown.</p></div>`+attemptsHTML()}
